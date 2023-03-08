@@ -91,7 +91,9 @@ environmental=read.csv("repoenvpredictors2022.csv",row.names = "X")
 #### predictors by genus ####
 
 plas=plaspresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
+scaled=cbind(plas[,c("x","y")],scale(plas[c(4:12,14,15)]))
 write.csv(plas,"plaspredictors.csv")
+
 hae=haepresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
 write.csv(hae,"plaspredictors.csv")
 leu=leupresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
