@@ -1,4 +1,3 @@
-#setwd("D:/rphd/chapter1/chapter1advanced/finalcode/final202202")
 library(picante)
 library(dplyr)
 library(doParallel)
@@ -210,7 +209,7 @@ names(leurpdcons)=c("RPD")
 ####################################  Dependent variables for modelling (unique measure)
 #Richness for each genus
 plasrichness%>%cbind(plaspresabF[c(1:4)],plaspsvcon,plasrpdcons)%>%
-  write.csv("plasrichness.csv")
+  write.csv("plasdependent.csv")
 haerichness%>%cbind(haepresabF[c(1:4)],haepsvcon,haerpdcons)%>%
   write.csv("haedependent.csv")
 leurichness%>%cbind(leupresabF[c(1:4)],leupsvcon,leurpdcons)%>%
