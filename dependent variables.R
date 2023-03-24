@@ -70,19 +70,14 @@ sqrt(plasrichness)%>%cbind(plaspresabF[c(1:4)],plaspsvcon,plasrpdcons)%>%
 haepresabF=read.csv("repohaemoproteusPAM",row.names = 1)#Load parasite presence absense matrices
 haegeoR=haepresabF[c(1:4)]
 #Load data ####
-haeonethoustrees=read.tree("haemoproteussampletrees")#sample of 1000 parasite trees for each genus
-haecontree=ape::read.nexus("compathae.tre")#consensus tree
-haetrr<-list()
-for(i in 1:1000){
-  haetrr[[i]]<-ape::root(haeonethoustrees[[i]], "GALLUS06", resolve.root = T)#resolve.root = TRUE, root adds a zero-length branch below the MRCA of the ingroup
-}
+haeonethoustrees=read.tree("haesampletrees")#sample of 1000 parasite trees for each genus
 my.cluster <- parallel::makeCluster(#Activate cluster to do it in paralell
   6,   # number of available cores  
   type = "PSOCK"
 )
 doParallel::registerDoParallel(cl = my.cluster)
 haenewdata=foreach::foreach(i = 1:1000)%dopar%{#haemodium data
-  picante::match.phylo.comm(haetrr[[i]],haepresabF)                          
+  picante::match.phylo.comm(haeonethoustrees[[i]],haepresabF)                          
 }
 haepsv=foreach::foreach(i = 1:1000)%dopar%{ #PSV for haemodium
   picante::psd(haenewdata[[i]]$comm,haenewdata[[i]]$phy, compute.var=T,scale.vcv=T)
@@ -128,19 +123,15 @@ sqrt(haerichness)%>%cbind(haepresabF[c(1:4)],haepsvcon,haerpdcons)%>%
 leupresabF=read.csv("repoleucocytozoonPAM",row.names = 1)#Load parasite presence absense matrices
 leugeoR=leupresabF[c(1:4)]
 #Load data ####
-leuonethoustrees=read.tree("leucocytozoonsampletrees")#sample of 1000 parasite trees for each genus
+leuonethoustrees=read.tree("leusampletrees")#sample of 1000 parasite trees for each genus
 leucontree=ape::read.nexus("compatleu.tre")#consensus tree
-leutrr<-list()
-for(i in 1:1000){
-  leutrr[[i]]<-ape::root(leuonethoustrees[[i]], "PADOM09", resolve.root = T)#resolve.root = TRUE, root adds a zero-length branch below the MRCA of the ingroup
-}
 my.cluster <- parallel::makeCluster(#Activate cluster to do it in paralell
   6,   # number of available cores  
   type = "PSOCK"
 )
 doParallel::registerDoParallel(cl = my.cluster)
 leunewdata=foreach::foreach(i = 1:1000)%dopar%{#leumodium data
-  picante::match.phylo.comm(leutrr[[i]],leupresabF)                          
+  picante::match.phylo.comm(leuonethoustrees[[i]],leupresabF)                          
 }
 leupsv=foreach::foreach(i = 1:1000)%dopar%{ #PSV for leumodium
   picante::psd(leunewdata[[i]]$comm,leunewdata[[i]]$phy, compute.var=T,scale.vcv=T)
