@@ -4,13 +4,12 @@ library(doParallel)
 library(parallel)
 library(foreach)
 library(mgcv)
-#In this script we calculate phylogenetic metrics (RPD and PSV) from  100 mcc trees for each genus
+#In this script, we calculate phylogenetic metrics (RPD and PSV) from  100 mcc trees for each genus
 # Plasmodium ####
 plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absense matrices
-plasgeoR<-plaspresab[c(1:4)]#reference of assemblages
 plastrr<-read.tree("plasmcctrees")#load trees
 my.cluster <- parallel::makeCluster(#Activate cluster to do it in paralell
-  4,   # number of available cores  
+  6,   # number of available cores  
   type = "PSOCK"
 )
 doParallel::registerDoParallel(cl = my.cluster)
@@ -28,7 +27,7 @@ for(i in 1:100){
   plaspsvdef[[i]]<-plaspsv[[i]]%>%dplyr::select("PSV")
 }
 plaspsv100<-do.call(cbind, plaspsvdef)
-plaspsv100df<-plaspsv100%>%cbind(plasgeoR[c("x","y")])
+plaspsv100df<-plaspsv100%>%cbind(plaspresab[c("x","y")])
 write.csv(plaspsv100df,"plaspsv100.csv")#Save PSV for Plasmodium assemblages
 plaspddef<-list()
 for(i in 1:100){
@@ -40,7 +39,7 @@ plaspd100<-do.call(cbind, plaspddef)
 dataplas<-list()
 plasrpd<-list()
 for (i in 1:100){
-  dataplas[[i]]<-plaspd100[c(i)]%>%cbind(plasrichness,(plasgeoR[c(3,4)]))%>%na.omit()
+  dataplas[[i]]<-plaspd100[c(i)]%>%cbind(plasrichness,(plaspresab[c("x","y")]))%>%na.omit()
   plasrpd[[i]]<-as.data.frame(resid(gam(PD~s((SR)),data=dataplas[[i]]))) #RPD for Plasmodium as residuals of gam regression 
 }
 plasrpd100<-do.call(cbind, plasrpd)
@@ -49,7 +48,6 @@ names(plasrpd100df)=c(rep("RPD",100),"x","y")
 write.csv(plasrpd100df,"plasrpd100.csv")#Save RPD for Plasmodium assemblages
 # Haemoproteus ####
 haepresab<-read.csv("haemoproteusPAM",row.names = 1)
-haegeoR<-haepresabF[c(1:4)]
 #Load data ####
 haetrr<-read.tree("haemcctrees")
 my.cluster <- parallel::makeCluster(
@@ -71,7 +69,7 @@ for(i in 1:100){
   haepsvdef[[i]]<-haepsv[[i]]%>%dplyr::select("PSV")
 }
 haepsv100<-do.call(cbind, haepsvdef)
-haepsv100df<-haepsv100%>%cbind(haegeoR[c("x","y")])
+haepsv100df<-haepsv100%>%cbind(haepresab[c("x","y")])
 write.csv(haepsv100df,"haepsv100.csv")
 haepddef<-list()
 for(i in 1:100){
@@ -83,7 +81,7 @@ haepd100<-do.call(cbind, haepddef)
 datahae<-list()
 haerpd<-list()
 for (i in 1:100){
-  datahae[[i]]<-haepd100[c(i)]%>%cbind(haerichness,(haegeoR[c(3,4)]))%>%na.omit()
+  datahae[[i]]<-haepd100[c(i)]%>%cbind(haerichness,(haepresab[c("x","y")]))%>%na.omit()
   haerpd[[i]]<-as.data.frame(resid(gam(PD~s((SR)),data=datahae[[i]])))
 }
 haerpd100<-do.call(cbind, haerpd)
@@ -92,7 +90,6 @@ names(haerpd100df)<-c(rep("RPD",100),"x","y")
 write.csv(haerpd100df,"haerpd100.csv")
 # Leucocytozoon ####
 leupresab<-read.csv("leucocytozoonPAM",row.names = 1)
-leugeoR<-leupresab[c(1:4)]
 #Load data ####
 leutrr<-read.tree("leumcctrees")
 my.cluster <- parallel::makeCluster(
@@ -114,7 +111,7 @@ for(i in 1:100){
   leupsvdef[[i]]<-leupsv[[i]]%>%dplyr::select("PSV")
 }
 leupsv100<-do.call(cbind, leupsvdef)
-leupsv100df<-leupsv100%>%cbind(leugeoR[c("x","y")])
+leupsv100df<-leupsv100%>%cbind(leupresab[c("x","y")])
 write.csv(leupsv100df,"leupsv100.csv")
 leupddef<-list()
 for(i in 1:100){
@@ -126,7 +123,7 @@ leupd100<-do.call(cbind, leupddef)
 dataleu<-list()
 leurpd<-list()
 for (i in 1:100){
-  dataleu[[i]]<-leupd100[c(i)]%>%cbind(leurichness,(leugeoR[c(3,4)]))%>%na.omit()
+  dataleu[[i]]<-leupd100[c(i)]%>%cbind(leurichness,(leupresab[c("x","y")]))%>%na.omit()
   leurpd[[i]]<-as.data.frame(resid(gam(PD~s((SR)),data=dataleu[[i]]))) 
 }
 leurpd100<-do.call(cbind, leurpd)

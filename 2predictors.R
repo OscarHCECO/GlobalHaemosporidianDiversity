@@ -60,7 +60,7 @@ genusleu.regionras <- regiongrid%>%over(genusleu.SPDFmal,returnList = T)%>%lappl
 leuid=regiongrid%>%over(genusleu.SPDFmal,returnList = F)%>%cbind(as.data.frame(coordinates(regiongrid)))
 leuid=leuid%>%dplyr::select(c(ncol(leuid),(ncol(leuid)-1)))%>%purrr::set_names("y","x")%>%mutate(".id"=row.names(leuid))
 leucommunitigeneralism=genusleu.regionras%>%group_by(.id)%>%summarize(mean(PD))%>%as.data.frame()%>%merge(leuid,by=".id")
-colnames(leucommunitigeneralism)[2]="Generalism_degree"
+colnames(leucommunitigeneralism)[2]="Degree_of_generalism"
 #### Host richness ####
 library(raster)
 library(rgdal)
@@ -95,13 +95,13 @@ environmental=read.csv("envpredictors.csv",row.names = "X")
 #-EVI (2000-2020 mean Enhanced vegetation index from MODIS-MOD12A3)
 #### predictors by genus 
 
-plas=plaspresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
+plas=plaspresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
 #scaled=cbind(plas[,c("x","y")],scale(plas[c(4:12,14,15)]))
 write.csv(plas,"plaspredictors.csv")
 
-hae=haepresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
+hae=haepresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
 write.csv(hae,"haepredictors.csv")
-leu=leupresabF[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
+leu=leupresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
 write.csv(leu,"leupredictors.csv")
 
 #Now we have all dependent variables and all predictors for the data analysis data
