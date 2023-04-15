@@ -9,28 +9,36 @@ my.cluster <- parallel::makeCluster(
   ncores, 
   type = "PSOCK"
 )
-seed<-sample(4,100,replace=T)
 #Plasmodium ####
 plaspredictors<-read.csv("plaspredictors.csv",row.names=1)#load predictors dataset 
+#################################### SR 
+plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("Human_footprint",
+                                                               "Humanpopdens","Ec.Het","PET","Rain_seasonality")]
+plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absense matrices
+plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
+  purrr::set_names("SR")%>%cbind(plaspresab[c("x","y")])%>%merge(plaspredictorssr,by=(c("x","y")))%>%
+  na.omit()
+
+plasSR<-geoGAM::geoGAM(response="SR", covariates = (names(plasrichness[,c(4:ncol(plasrichness))])),
+                       data=plasrichness, coords = c("x","y"),
+                       max.stop = 1000, verbose = 2,non.stationary = T)
+
+summary(plasSR)
+AIC(plasSR$gam.final)
+plasSR$gam.final
 #################################### RPD
 plasrpd100<-read.csv("plasrpd100.csv",row.names = 1)%>%# Load measures of plasmoproteus RPD based on 1000 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
-plaspredictors1<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens")]
-plasrpd1<-list()
+plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","PET")]
 plasrpd<-list()
 for (i in 1:100){
   plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictors1,by=c("x","y"))%>%na.omit()
 }
-#Some models were unable to fit since there were no explanatory vaiables or there were
-#not enought degrees of freedom to fit the knots 
-#here are excluded
-#c(2,49)
-doParallel::registerDoParallel(cl = my.cluster)
 doParallel::registerDoParallel(cl = my.cluster)
 plasgamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
-  geoGAM::geoGAM(response="RPD", covariates = names(plaspredictors1[3:ncol(plaspredictors1)]),
+  geoGAM::geoGAM(response="RPD", covariates = names(plaspredictorsrpd[3:ncol(plaspredictorsrpd)]),
                  data=as.data.frame(plasrpd[[i]]), coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)
 }
 plasrpdgamclass<-lapply(plasgamrpd,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
 plasrpdnotfitted<-(which(plasrpdgamclass$class!="geoGAM",T))
@@ -39,6 +47,7 @@ if (length(plasrpdnotfitted)>=1){
 }else{
   plasgamrpd<-plasgamrpd
 }
+length(plasgamrpd)#Total models fitted
 plassumm<-list()#pull the data of the models
 plasaic<-list()
 plasdevexplain<-list()
@@ -75,52 +84,52 @@ apply(plasrpddata1,2,sd)#
 plasrpddata2<-plassmoothtable1%>%plyr::ldply(rbind)%>%as.data.frame()
 colnames(plasrpddata2)[c(4,5)]<-c("pval","variable")
 table(plasrpddata2$variable)#How many times a predictor was fitted in the final (best) model
-
+plasrpdpreds<-length(unique(plasrpddata2$variable))
 plasmeanedfrpd<-aggregate(plasrpddata2$edf, list(plasrpddata2$variable), FUN=mean)
 plassdedf<-aggregate(plasrpddata2$edf, list(plasrpddata2$variable), FUN=sd)
 plasrpdedf<-list()
-for (i in 1:10){
+for (i in 1:plasrpdpreds){
   plasrpdedf[[i]]<-(paste0(round(plasmeanedfrpd[i,2],3)," ± ",round(plassdedf[i,2],3)))
 }
 plasrpdedf<-as.data.frame(do.call(rbind,plasrpdedf))
 hameanrefdfrpd<-aggregate(plasrpddata2$Ref.df, list(plasrpddata2$variable), FUN=mean)
 plassdrefdf<-aggregate(plasrpddata2$Ref.df, list(plasrpddata2$variable), FUN=sd)
 plasrefdf<-list()
-for (i in 1:10){
+for (i in 1:plasrpdpreds){
   plasrefdf[[i]]<-(paste0(round(hameanrefdfrpd[i,2],3)," ± ",round(plassdrefdf[i,2],3)))
 }
 plasrefdf<-as.data.frame(do.call(rbind,plasrefdf))
 plasmeanfrpd<-aggregate(plasrpddata2$F, list(plasrpddata2$variable), FUN=mean)
 plassdfrpd<-aggregate(plasrpddata2$F, list(plasrpddata2$variable), FUN=sd)
 plasfrpd<-list()
-for (i in 1:10){
+for (i in 1:plasrpdpreds){
   plasfrpd[[i]]<-(paste0(round(plasmeanfrpd[i,2],3)," ± ",round(plassdfrpd[i,2],3)))
 }
 plasfrpd<-as.data.frame(do.call(rbind,plasfrpd))
 plasmeanprpd<-aggregate(plasrpddata2$pval, list(plasrpddata2$variable), FUN=mean)
 plassdprpd<-aggregate(plasrpddata2$pval, list(plasrpddata2$variable), FUN=sd)
 plasprpd<-list()
-for (i in 1:10){
+for (i in 1:plasrpdpreds){
   plasprpd[[i]]<-(paste0(round(plasmeanprpd[i,2],3)," ± ",round(plassdprpd[i,2],3)))
 }
 plasprpd<-as.data.frame(do.call(rbind,plasprpd))
 cbind(as.data.frame(plasmeanprpd[1]),plasrpdedf,plasrefdf,plasfrpd,plasprpd)%>%
   purrr::set_names("predictor","edf","ref.df","f","p")
-
 #################################### PSV
 plaspsv100<-read.csv("plaspsv100.csv",row.names = 1)%>%# Load measures of plasmoproteus psv based on 1000 phylogenetic trees
   purrr::set_names(c(rep("psv",100),"x","y"))
-plaspredictors2<-plaspredictors[,!names(plaspredictors) %in%c("Human_footprint","Host_richness",
-                                                             "PET")]
-plaspsv1<-list()
+#RERUN MODEL WITHOUT CONFOUNDING VARIABLES (unsignificannt PREDICTORS IN LESS TAHN 10% of the models )
+plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","Human_footprint",
+                                                              "Host_richness","Ec.Het","PET",
+                                                              "Rain_seasonality")]
 plaspsv<-list()
 for (i in 1:100){
-  plaspsv[[i]]<-plaspsv100[c(i,101,102)]%>%merge(plaspredictors2,by=c("x","y"))%>%na.omit()
+  plaspsv[[i]]<-plaspsv100[c(i,101,102)]%>%merge(plaspredictorspsv,by=c("x","y"))%>%na.omit()
 }
 plasgampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
-  geoGAM::geoGAM(response="psv", covariates = names(plaspredictors2[3:ncol(plaspredictors2)]),
+  geoGAM::geoGAM(response="psv", covariates = names(plaspredictorspsv[3:ncol(plaspredictorspsv)]),
                  data=as.data.frame(plaspsv[[i]]), coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)
 }
 plaspsvgamclass<-lapply(plasgampsv,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
 plaspsvnotfitted<-(which(plaspsvgamclass$class!="geoGAM",T))
@@ -129,6 +138,7 @@ if (length(plaspsvnotfitted)>=1){
 }else{
   plasgampsv<-plasgampsv
 }
+length(plasgampsv)#Total models fited
 plassumm2<-list()
 plasaic2<-list()
 plasdevexplain2<-list()
@@ -163,65 +173,68 @@ apply(plaspsvdata1,2,sd)#
 plaspsvdata2<-plassmoothtable3%>%plyr::ldply(rbind)%>%as.data.frame()
 colnames(plaspsvdata2)[c(4,5)]<-c("pval","variable")
 table(plaspsvdata2$variable)#How many times a predictor was fitted in the final (best) model
-
+plaspsvpreds<-length(unique(plaspsvdata2$variable))#Number of final predictors
 plasmeanedfpsv<-aggregate(plaspsvdata2$edf, list(plaspsvdata2$variable), FUN=mean)
 plassdedf2<-aggregate(plaspsvdata2$edf, list(plaspsvdata2$variable), FUN=sd)
 plaspsvedf<-list()
-for (i in 1:2){
+for (i in 1:plaspsvpreds){
   plaspsvedf[[i]]<-(paste0(round(plasmeanedfpsv[i,2],3)," ± ",round(plassdedf2[i,2],3)))
 }
 plaspsvedf<-as.data.frame(do.call(rbind,plaspsvedf))
 hameanrefdfpsv<-aggregate(plaspsvdata2$Ref.df, list(plaspsvdata2$variable), FUN=mean)
 plassdrefdf2<-aggregate(plaspsvdata2$Ref.df, list(plaspsvdata2$variable), FUN=sd)
 plasrefdf2<-list()
-for (i in 1:2){
+for (i in 1:plaspsvpreds){
   plasrefdf2[[i]]<-(paste0(round(hameanrefdfpsv[i,2],3)," ± ",round(plassdrefdf2[i,2],3)))
 }
 plasrefdf2<-as.data.frame(do.call(rbind,plasrefdf2))
 plasmeanfpsv<-aggregate(plaspsvdata2$F, list(plaspsvdata2$variable), FUN=mean)
 plassdfpsv<-aggregate(plaspsvdata2$F, list(plaspsvdata2$variable), FUN=sd)
 plasfpsv<-list()
-for (i in 1:2){
+for (i in 1:plaspsvpreds){
   plasfpsv[[i]]<-(paste0(round(plasmeanfpsv[i,2],3)," ± ",round(plassdfpsv[i,2],3)))
 }
 plasfpsv<-as.data.frame(do.call(rbind,plasfpsv))
 plasmeanppsv<-aggregate(plaspsvdata2$pval, list(plaspsvdata2$variable), FUN=mean)
 plassdppsv<-aggregate(plaspsvdata2$pval, list(plaspsvdata2$variable), FUN=sd)
 plasppsv<-list()
-for (i in 1:2){
+for (i in 1:plaspsvpreds){
   plasppsv[[i]]<-(paste0(round(plasmeanppsv[i,2],3)," ± ",round(plassdppsv[i,2],3)))
 }
 plasppsv<-as.data.frame(do.call(rbind,plasppsv))
 cbind(as.data.frame(plasmeanppsv[1]),plaspsvedf,plasrefdf2,plasfpsv,plasppsv)%>%
   purrr::set_names("predictor","edf","ref.df","f","p")
-
-#################################### SR 
-plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absense matrices
-plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(plaspresab[c("x","y")])%>%merge(plaspredictors,by=(c("x","y")))%>%
-  na.omit()
-
-plasSR<-geoGAM::geoGAM(response="SR", covariates = (names(plasrichness[,c(4:ncol(plasrichness))])),
-               data=plasrichness, coords = c("x","y"),
-               max.stop = 1000, verbose = 2,non.stationary = T)
-
-summary(plasSR)
-AIC(plasSR$gam.final)
-
 #Haemoproteus ####
 haepredictors<-read.csv("haepredictors.csv",row.names=1)#load predictors dataset 
+#################################### SR
+haepredictorssr<-haepredictors[,!names(haepredictors) %in%c("Ec.Het")]
+
+haepresab<-read.csv("haemoproteusPAM",row.names = 1)#Load parasite presence absense matrices
+haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
+  purrr::set_names("SR")%>%cbind(haepresab[c("x","y")])%>%merge(haepredictorssr,by=(c("x","y")))%>%
+  na.omit()
+
+haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
+                      data=haerichness, coords = c("x","y"),
+                      max.stop = 1000, verbose = 2,non.stationary = T, seed=seed[32])
+
+summary(haeSR)
+AIC(plasSR$gam.final)
+
 #################################### RPD
 haerpd1000<-read.csv("haerpd100.csv",row.names = 1)%>%# Load measures of Haemoproteus RPD based on 1000 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
+haepredictorsrpd<-haepredictors[,!names(haepredictors) %in%c("Human_footprint","Humanpopdens")]
+
 haerpd<-list()
 for (i in 1:100){
-  haerpd[[i]]<-haerpd1000[c(i,101,102)]%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
+  haerpd[[i]]<-haerpd1000[c(i,101,102)]%>%merge(haepredictorsrpd,by=c("x","y"))%>%na.omit()
 }
 doParallel::registerDoParallel(cl = my.cluster)
 haegamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
-  geoGAM::geoGAM(response="RPD", covariates = names(haepredictors[3:ncol(haepredictors)]),
+  geoGAM::geoGAM(response="RPD", covariates = names(haepredictorsrpd[3:ncol(haepredictorsrpd)]),
                  data=as.data.frame(haerpd[[i]]), coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)
 }
 haerpdgamclass<-lapply(haegamrpd,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
 haerpdnotfitted<-(which(haerpdgamclass$class!="geoGAM",T))
@@ -230,6 +243,7 @@ if (length(haerpdnotfitted)>=1){
 }else{
   haegamrpd<-haegamrpd
 }
+length(haegamrpd)
 haesumm<-list()
 haeaic<-list()
 haedevexplain<-list()
@@ -379,18 +393,6 @@ cbind(as.data.frame(haemeanppsv[1]),haepsvedf,haerefdf2,haefpsv,haeppsv)%>%
   purrr::set_names("predictor","edf","ref.df","f","p")
 
 
-#################################### SR
-haepresab<-read.csv("haemoproteusPAM",row.names = 1)#Load parasite presence absense matrices
-haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(haepresab[c("x","y")])%>%merge(haepredictors,by=(c("x","y")))%>%
-  na.omit()
-
-haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
-                       data=haerichness, coords = c("x","y"),
-                       max.stop = 1000, verbose = 2,non.stationary = T)
-
-summary(haeSR)
-AIC(plasSR$gam.final)
 
 # Leucocytozoon ####
 leupredictors<-read.csv("leupredictors.csv",row.names=1)#load predictors dataset 
