@@ -258,7 +258,7 @@ A=ggplot(data=srdf1,aes(overall,factor(names,level=(order)),fill=factor(genus,le
                                                                                      size=10),
                                                           axis.text.y = element_text( 
                                                             size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels)
+  scale_y_discrete(name ="Predictors",labels=labels)+geom_vline(xintercept=10)
 
 #RPD varimp ####
 plasimprpdmean=aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=mean)
@@ -282,11 +282,12 @@ names(bardataimprdpsdup)="upper"
 bardataimprdpsdown<-as.data.frame(dataimprdp$mean-dataimprdp$sd)
 names(bardataimprdpsdown)<-"lower"
 dfrpdimp=cbind(dataimprdp,bardataimprdpsdown,bardataimprdpsdup)
-cat=(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
+cat=(c("host","land","land","host","human","human","climatic","climatic",#Category of predictor to order
+       "climatic","climatic","climatic","x","x"))
 cat=rep(cat,3)
 df1=cbind(dfrpdimp,cat)
 df1=df1[order(df1$cat, decreasing = TRUE), ]
-order=c("Temperatire_seasonality","Rain_seasonality","Temperature","Precipitation","PET","EVI","Ec.Het","Host_richness","Degree_of_generalism",
+order=c("Temperature_seasonality","Rain_seasonality","Temperature","Precipitation","PET","EVI","Ec.Het","Host_richness","Degree_of_generalism",
         "Humanpopdens","Human_footprint","y","x")
 labels=c("Temperature seasonality","Rain seasonality","Temperature","Precipitation","PET","EVI","Ecosystem heterogeneity",
          "Host richness","Degree of generalism","Human population density","Human footprint","y","x")
@@ -306,7 +307,7 @@ B<-ggplot(data=df1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=
                                                                                      size=10),
                                                           axis.text.y = element_text( 
                                                             size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels) 
+  scale_y_discrete(name ="Predictors",labels=labels)+geom_vline(xintercept=10)
 
 #PSV varimp ####
 
@@ -326,12 +327,13 @@ leuimppsvdf=merge(leuimppsvmean,leuimppsvsd,by="Group.1")
 names(leuimppsvdf)=c("names","mean","sd")
 leuimppsvdf=leuimppsvdf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimppsvdf)))))
 dataimppsv=rbind(plasimppsvdf,haeimppsvdf,leuimppsvdf)
-bardataimppsvsdup<-as.data.frame(dataimppsv$mean+dataimppsv$sd)
+bardataimppsvsdup<-as.data.frame(dataimppsv$mean+dataimppsv$sd)#Error bars with standard deviation
 names(bardataimppsvsdup)="upper"
 bardataimppsvsdown<-as.data.frame(dataimppsv$mean-dataimppsv$sd)
 names(bardataimppsvsdown)<-"lower"
 dfpsvimp=cbind(dataimppsv,bardataimppsvsdown,bardataimppsvsdup)
-cat=(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
+cat=(c("host","land","land","host","human","human","climatic","climatic",#Category of predictor to order
+       "climatic","climatic","climatic","x","x"))
 cat=rep(cat,3)
 psvdf1=cbind(dfpsvimp,cat)
 psvdf1=psvdf1[order(psvdf1$cat, decreasing = TRUE), ]
@@ -355,7 +357,7 @@ C=ggplot(data=psvdf1,aes(mean,factor(names,level=(order)),fill=factor(genus,leve
                                                                                      size=10),
                                                           axis.text.y = element_text( 
                                                             size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels)
+  scale_y_discrete(name ="Predictors",labels=labels)+geom_vline(xintercept=10)
 
 
 

@@ -1,5 +1,4 @@
 pulldata<-function(geogam){
-  geogam<-plasgamrpd 
   gamclass<-lapply(geogam,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
   notfitted<-(which(gamclass$class!="geoGAM",T))
   if (length(notfitted)>=1){
