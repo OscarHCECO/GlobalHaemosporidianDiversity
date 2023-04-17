@@ -4,7 +4,7 @@ The four scripts included are:
 - `dependent variables` calulate pylogenetic diversity metrics of parasite assemblages.
 - `predictors` calculates predictors such as host richness and degree of generalism and merges it with environmental data obtained from different products.
 - `varimpanalysis` performs a variable importance analysis
-- `geogammodels` performs the model building process.
+- `geogammodels` performs the model building process (to summarize model output, use the funtion in the script `pulldatafunctionr`).
 
 Parasite data was downloaded from MalAvi (Host and Sites table.
 Parasite phylogenetic hypotheses were obtained using MrBayes at CIPRES geteway, followwing the workflow as impemented by the R package "treespace", 100 mcc trees were produced by identifying 100 tree clusters from a 10000 trees sample of the mcmc runs. 
