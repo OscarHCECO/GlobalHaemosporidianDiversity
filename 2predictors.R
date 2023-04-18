@@ -93,12 +93,13 @@ environmental<-read.csv("envpredictors.csv",row.names = "X")
 #### predictors by genus 
 
 plas<-plaspresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
-#scaled=cbind(plas[,c("x","y")],scale(plas[c(4:12,14,15)]))
+plas<-cbind(plas[,c("x","y")],scale(plas[c(3:13)]))#Standardize predictors
 write.csv(plas,"plaspredictors.csv")
-
 hae<-haepresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
+hae<-cbind(hae[,c("x","y")],scale(hae[c(3:13)]))
 write.csv(hae,"haepredictors.csv")
 leu<-leupresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
+leu<-cbind(leu[,c("x","y")],scale(leu[c(3:13)]))
 write.csv(leu,"leupredictors.csv")
 
 #Now we have all dependent variables and all predictors for the data analysis

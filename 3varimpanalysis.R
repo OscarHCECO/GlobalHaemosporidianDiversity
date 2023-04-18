@@ -238,12 +238,11 @@ catsr<-rev(c("climatic","climatic","land","land","human","host","host","human","
 catsr<-rep(catsr,3)
 srdf1<-cbind(dataimpsr,genus,catsr)
 srdf1<-srdf1[order(srdf1$catsr, decreasing = TRUE), ]
-genera<-c("Plasmodium","Haemoproteus","Leucocytozoon")
 
-ggplot(data=srdf1,aes(overall,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=srdf1,aes(overall,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(a) SR")
+  ggtitle("(a) SR")+geom_vline(xintercept=10)
   
 #RPD varimp ####
 plasimprpdmean<-aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=mean)
@@ -267,16 +266,12 @@ names(bardataimprdpsdup)<-"upper"
 bardataimprdpsdown<-as.data.frame(dataimprdp$mean-dataimprdp$sd)
 names(bardataimprdpsdown)<-"lower"
 dfrpdimp<-cbind(dataimprdp,bardataimprdpsdown,bardataimprdpsdup)
-cat<-(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-cat<-rep(cat,3)
-df1<-cbind(dfrpdimp,cat)
-df1<-df1[order(df1$cat, decreasing = TRUE), ]
 
-ggplot(data=df1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=dfrpdimp,aes(mean,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(b) RPD")
+  ggtitle("(b) RPD")+geom_vline(xintercept = 10)
 
 #PSV varimp ####
 plasimppsvmean<-aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=mean)
@@ -300,15 +295,12 @@ names(bardataimppsvsdup)<-"upper"
 bardataimppsvsdown<-as.data.frame(dataimppsv$mean-dataimppsv$sd)
 names(bardataimppsvsdown)<-"lower"
 dfpsvimp<-cbind(dataimppsv,bardataimppsvsdown,bardataimppsvsdup)
-cat<-(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-cat<-rep(cat,3)
-psvdf1<-cbind(dfpsvimp,cat)
-psvdf1<-psvdf1[order(psvdf1$cat, decreasing = TRUE), ]
 
-ggplot(data=psvdf1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=dfpsvimp,aes(mean,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(c) PSV")
+  ggtitle("(c) PSV")+geom_vline(xintercept=10)
+
 
 

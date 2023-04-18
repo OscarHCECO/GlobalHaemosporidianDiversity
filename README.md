@@ -1,8 +1,18 @@
-# GlobalHaemosporidianDiversity
-- This repository corresponds to the manuscript entitled ""
-- There are three scripts, one for calculation of dependen variables, another of calculation of
-predictors such as host richness and degree of generalism and merging with environmental data obtained from diferent products, finally an script with varimp analysys, geogam modelling, and graphical output
+# Global Haemosporidian Diversity
+This repository contains the scripts used in the analysis presented in the manuscript titled "Energy input, Habitat heterogeneity, and host specificity of parasites explain variation in the diversity of avian haemosporidian assemblages at continental scales."
+The four scripts included are:
+- `dependent variables` calulate pylogenetic diversity metrics of parasite assemblages.
+- `predictors` calculates predictors such as host richness and degree of generalism and merges it with environmental data obtained from different products.
+- `varimpanalysis` performs a variable importance analysis
+- `geogammodels` performs the model building process (to summarize model output, use the funtion in the script `pulldatafunctionr`).
 
-- Parasite data was downloaded from MalAvi (Host and Sites table, http://130.235.244.92/bcgi/malaviReport.cgi?report4=Hosts+And+Sites+Table)
-- Parasite phylogenetic hypotheses were obtained using MrBayes at CIPRES geteway (https://www.phylo.org/)
--Environmental datum were obtained from bioclimatic variables of worldclim (https://www.worldclim.org/)
+Parasite data was downloaded from MalAvi (Host and Sites table.
+Parasite phylogenetic hypotheses were obtained using MrBayes at CIPRES geteway, followwing the workflow as impemented by the R package "treespace", 100 mcc trees were produced by identifying 100 tree clusters from a 10000 trees sample of the mcmc runs. 
+
+Environmental datum were obtained from several sources, including:
+- Bioclimatic variables of worldclim (annual mean temperature-Bio1, temperature seasonality-Bio 4, precipitation seasonality-Bio 15, and annual precipitation-Bio 12)
+- Global human population density (GPW) from CIESIN
+- Human footprint from venter et al. 2017, 
+- Potential evapotranspiration modelled with worldclim data and using the Penman-Monteith equation
+- Ecosystem heterogeneity calculated with Rao´s Q, diversity metric of evi measures within a cell using RASTERDIV package workflow
+- 2000-2020 mean Enhanced vegetation index from MODIS-MOD12A3

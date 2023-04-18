@@ -4,32 +4,42 @@ library(parallel)
 library(geoGAM)
 library(mgcv)
 library(caret)
-ncores=detectCores()-1
+library(ggplot2)
+ncores=detectCores()-1#Prepare a cluster to run analysis in parallel, here use all your cores -1
 my.cluster <- parallel::makeCluster(
   ncores, 
   type = "PSOCK"
 )
 #Plasmodium ####
-plaspredictors<-read.csv("plaspredictors.csv",row.names=1)#load predictors dataset 
+plaspredictors<-read.csv("plaspredictors.csv",row.names=1)#load data set with predictors for assemblages of each genus 
 #################################### SR 
-plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("Human_footprint",
+plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("Human_footprint",#Delete less important predictors (<10 in varimp analysis)
                                                                "Humanpopdens","Ec.Het","PET","Rain_seasonality")]
-plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absense matrices
+plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absence matrices
 plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
   purrr::set_names("SR")%>%cbind(plaspresab[c("x","y")])%>%merge(plaspredictorssr,by=(c("x","y")))%>%
-  na.omit()
-
+  na.omit()#Ichness is the squared root of the sum of lineages detected in each cell 
 plasSR<-geoGAM::geoGAM(response="SR", covariates = (names(plasrichness[,c(4:ncol(plasrichness))])),
-                       data=plasrichness, coords = c("x","y"),
+                       data=plasrichness, coords = c("x","y"),#Perform a geogam model building procedure 
                        max.stop = 1000, verbose = 2,non.stationary = T)
-
 summary(plasSR)
 AIC(plasSR$gam.final)
 plasSR$gam.final
+#Plots
+gray7=gray(0.3)
+ggplot(data=plasrichness,aes(Degree_of_generalism,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")
+ggplot(data=plasrichness,aes(Host_richness,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")
+
 #################################### RPD
-plasrpd100<-read.csv("plasrpd100.csv",row.names = 1)%>%# Load measures of plasmoproteus RPD based on 1000 phylogenetic trees
+plasrpd100<-read.csv("plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 100 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
-plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","PET")]
+plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","PET")]#Delete unimportant predictors
 plasrpd<-list()
 for (i in 1:100){
   plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictors1,by=c("x","y"))%>%na.omit()
@@ -38,88 +48,14 @@ doParallel::registerDoParallel(cl = my.cluster)
 plasgamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
   geoGAM::geoGAM(response="RPD", covariates = names(plaspredictorsrpd[3:ncol(plaspredictorsrpd)]),
                  data=as.data.frame(plasrpd[[i]]), coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)#Perform 100 geogam model building procedures
 }
-plasrpdgamclass<-lapply(plasgamrpd,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-plasrpdnotfitted<-(which(plasrpdgamclass$class!="geoGAM",T))
-if (length(plasrpdnotfitted)>=1){
-  plasgamrpd<-plasgamrpd[-c(plasrpdnotfitted)]
-}else{
-  plasgamrpd<-plasgamrpd
-}
-length(plasgamrpd)#Total models fitted
-plassumm<-list()#pull the data of the models
-plasaic<-list()
-plasdevexplain<-list()
-plasrsq<-list()
-plassmoothtable<-list()
-plassmoothtable1<-list()
-plaspredtable<-list()
-plasformula<-list()
-for(i in 1:length(plasgamrpd)){
-  plassumm[i]<-summary(plasgamrpd[[i]])
-  plasaic[[i]]<-AIC(plasgamrpd[[i]]$gam.final)
-  plasdevexplain[[i]]<-plassumm[[i]]$dev.expl
-}
-for(i in 1:length(plasgamrpd)){
-  plasrsq[[i]]<-plassumm[[i]]$r.sq
-  plassmoothtable[[i]]<-plassumm[[i]]$s.table
-} 
-for(i in 1:length(plasgamrpd)){
-  plassmoothtable1[[i]]<-cbind(plassmoothtable[[i]],as.data.frame(row.names(plassmoothtable[[i]])))
-  plaspredtable[[i]]<-plassumm[[i]]$p.table
-  plasformula[[i]]<-plassumm[[i]]$formula
-}
-plasestimates<-plaspredtable%>%plyr::ldply(rbind)
-plasaic<-plasaic%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plasrsq<-plasrsq%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plasdevexplain<-plasdevexplain%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plasrpddata1<-cbind(plasdevexplain,plasrsq,plasaic,plasestimates)
-names(plasrpddata1)<-c("Dev_exp","rsq","aic","Estimate",   
-                       "Std_Error", "t_value","p_val")
+pulldata(plasgamrpd)#Sumarizes data from the 100 models (you have to load this function to your workspace from "pulldatafunction" script)
 
-apply(plasrpddata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(plasrpddata1,2,sd)#
-
-plasrpddata2<-plassmoothtable1%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(plasrpddata2)[c(4,5)]<-c("pval","variable")
-table(plasrpddata2$variable)#How many times a predictor was fitted in the final (best) model
-plasrpdpreds<-length(unique(plasrpddata2$variable))
-plasmeanedfrpd<-aggregate(plasrpddata2$edf, list(plasrpddata2$variable), FUN=mean)
-plassdedf<-aggregate(plasrpddata2$edf, list(plasrpddata2$variable), FUN=sd)
-plasrpdedf<-list()
-for (i in 1:plasrpdpreds){
-  plasrpdedf[[i]]<-(paste0(round(plasmeanedfrpd[i,2],3)," ± ",round(plassdedf[i,2],3)))
-}
-plasrpdedf<-as.data.frame(do.call(rbind,plasrpdedf))
-hameanrefdfrpd<-aggregate(plasrpddata2$Ref.df, list(plasrpddata2$variable), FUN=mean)
-plassdrefdf<-aggregate(plasrpddata2$Ref.df, list(plasrpddata2$variable), FUN=sd)
-plasrefdf<-list()
-for (i in 1:plasrpdpreds){
-  plasrefdf[[i]]<-(paste0(round(hameanrefdfrpd[i,2],3)," ± ",round(plassdrefdf[i,2],3)))
-}
-plasrefdf<-as.data.frame(do.call(rbind,plasrefdf))
-plasmeanfrpd<-aggregate(plasrpddata2$F, list(plasrpddata2$variable), FUN=mean)
-plassdfrpd<-aggregate(plasrpddata2$F, list(plasrpddata2$variable), FUN=sd)
-plasfrpd<-list()
-for (i in 1:plasrpdpreds){
-  plasfrpd[[i]]<-(paste0(round(plasmeanfrpd[i,2],3)," ± ",round(plassdfrpd[i,2],3)))
-}
-plasfrpd<-as.data.frame(do.call(rbind,plasfrpd))
-plasmeanprpd<-aggregate(plasrpddata2$pval, list(plasrpddata2$variable), FUN=mean)
-plassdprpd<-aggregate(plasrpddata2$pval, list(plasrpddata2$variable), FUN=sd)
-plasprpd<-list()
-for (i in 1:plasrpdpreds){
-  plasprpd[[i]]<-(paste0(round(plasmeanprpd[i,2],3)," ± ",round(plassdprpd[i,2],3)))
-}
-plasprpd<-as.data.frame(do.call(rbind,plasprpd))
-cbind(as.data.frame(plasmeanprpd[1]),plasrpdedf,plasrefdf,plasfrpd,plasprpd)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
 #################################### PSV
-plaspsv100<-read.csv("plaspsv100.csv",row.names = 1)%>%# Load measures of plasmoproteus psv based on 1000 phylogenetic trees
+plaspsv100<-read.csv("plaspsv100.csv",row.names = 1)%>%# Load measures of Plasmodium psv based on 100 phylogenetic trees
   purrr::set_names(c(rep("psv",100),"x","y"))
-#RERUN MODEL WITHOUT CONFOUNDING VARIABLES (unsignificannt PREDICTORS IN LESS TAHN 10% of the models )
-plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","Human_footprint",
+plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","Human_footprint",#Delete unimportant predictors of PSV
                                                               "Host_richness","Ec.Het","PET",
                                                               "Rain_seasonality")]
 plaspsv<-list()
@@ -131,101 +67,43 @@ plasgampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
                  data=as.data.frame(plaspsv[[i]]), coords = c("x","y"),
                  max.stop = 1000, verbose = 2,non.stationary = T)
 }
-plaspsvgamclass<-lapply(plasgampsv,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-plaspsvnotfitted<-(which(plaspsvgamclass$class!="geoGAM",T))
-if (length(plaspsvnotfitted)>=1){
-  plasgampsv<-plasgampsv[-c(plaspsvnotfitted)]
-}else{
-  plasgampsv<-plasgampsv
+pulldata(plasgampsv)
+#Plots
+plotdataplaspsv<-list()
+for (i in 1:100){
+  plotdataplaspsv[[i]]<-cbind(plaspsv[[i]],as.data.frame(rep(paste0("model",i),322)))
 }
-length(plasgampsv)#Total models fited
-plassumm2<-list()
-plasaic2<-list()
-plasdevexplain2<-list()
-plasrsq2<-list()
-plassmoothtable2<-list()
-plassmoothtable3<-list()
-plaspredtable2<-list()
-plasformula2<-list()
-for(i in 1:length(plasgampsv)){
-  plassumm2[i]<-summary(plasgampsv[[i]])
-  plasaic2[[i]]<-AIC(plasgampsv[[i]]$gam.final)
-  plasdevexplain2[[i]]<-plassumm2[[i]]$dev.expl
-}
-for(i in 1:length(plasgampsv)){
-  plasrsq2[[i]]<-plassumm2[[i]]$r.sq
-  plassmoothtable2[[i]]<-plassumm2[[i]]$s.table
-} 
-for(i in 1:length(plasgampsv)){
-  plassmoothtable3[[i]]<-cbind(plassmoothtable2[[i]],as.data.frame(row.names(plassmoothtable2[[i]])))
-  plaspredtable2[[i]]<-plassumm2[[i]]$p.table
-  plasformula2[[i]]<-plassumm2[[i]]$formula
-}
-plasestimates2<-plaspredtable2%>%plyr::ldply(rbind)
-plasaic2<-plasaic2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plasrsq2<-plasrsq2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plasdevexplain2<-plasdevexplain2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-plaspsvdata1<-cbind(plasdevexplain2,plasrsq2,plasaic2,plasestimates2)
-names(plaspsvdata1)<-c("Dev_exp","rsq","aic","Estimate",   
-                       "Std_Error", "t_value","p_val")
-apply(plaspsvdata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(plaspsvdata1,2,sd)#
-plaspsvdata2<-plassmoothtable3%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(plaspsvdata2)[c(4,5)]<-c("pval","variable")
-table(plaspsvdata2$variable)#How many times a predictor was fitted in the final (best) model
-plaspsvpreds<-length(unique(plaspsvdata2$variable))#Number of final predictors
-plasmeanedfpsv<-aggregate(plaspsvdata2$edf, list(plaspsvdata2$variable), FUN=mean)
-plassdedf2<-aggregate(plaspsvdata2$edf, list(plaspsvdata2$variable), FUN=sd)
-plaspsvedf<-list()
-for (i in 1:plaspsvpreds){
-  plaspsvedf[[i]]<-(paste0(round(plasmeanedfpsv[i,2],3)," ± ",round(plassdedf2[i,2],3)))
-}
-plaspsvedf<-as.data.frame(do.call(rbind,plaspsvedf))
-hameanrefdfpsv<-aggregate(plaspsvdata2$Ref.df, list(plaspsvdata2$variable), FUN=mean)
-plassdrefdf2<-aggregate(plaspsvdata2$Ref.df, list(plaspsvdata2$variable), FUN=sd)
-plasrefdf2<-list()
-for (i in 1:plaspsvpreds){
-  plasrefdf2[[i]]<-(paste0(round(hameanrefdfpsv[i,2],3)," ± ",round(plassdrefdf2[i,2],3)))
-}
-plasrefdf2<-as.data.frame(do.call(rbind,plasrefdf2))
-plasmeanfpsv<-aggregate(plaspsvdata2$F, list(plaspsvdata2$variable), FUN=mean)
-plassdfpsv<-aggregate(plaspsvdata2$F, list(plaspsvdata2$variable), FUN=sd)
-plasfpsv<-list()
-for (i in 1:plaspsvpreds){
-  plasfpsv[[i]]<-(paste0(round(plasmeanfpsv[i,2],3)," ± ",round(plassdfpsv[i,2],3)))
-}
-plasfpsv<-as.data.frame(do.call(rbind,plasfpsv))
-plasmeanppsv<-aggregate(plaspsvdata2$pval, list(plaspsvdata2$variable), FUN=mean)
-plassdppsv<-aggregate(plaspsvdata2$pval, list(plaspsvdata2$variable), FUN=sd)
-plasppsv<-list()
-for (i in 1:plaspsvpreds){
-  plasppsv[[i]]<-(paste0(round(plasmeanppsv[i,2],3)," ± ",round(plassdppsv[i,2],3)))
-}
-plasppsv<-as.data.frame(do.call(rbind,plasppsv))
-cbind(as.data.frame(plasmeanppsv[1]),plaspsvedf,plasrefdf2,plasfpsv,plasppsv)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
+plotdataplaspsv<-do.call(rbind,plotdataplaspsv)
+colnames(plotdataplaspsv)[ncol(plotdataplaspsv)]<-"model"
+ggplot(data=plotdataplaspsv,aes(Degree_of_generalism,psv))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#Degree of generalism
+
+
 #Haemoproteus ####
-haepredictors<-read.csv("haepredictors.csv",row.names=1)#load predictors dataset 
+haepredictors<-read.csv("haepredictors.csv",row.names=1) 
 #################################### SR
 haepredictorssr<-haepredictors[,!names(haepredictors) %in%c("Ec.Het")]
-
-haepresab<-read.csv("haemoproteusPAM",row.names = 1)#Load parasite presence absense matrices
+haepresab<-read.csv("haemoproteusPAM",row.names = 1)
 haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
   purrr::set_names("SR")%>%cbind(haepresab[c("x","y")])%>%merge(haepredictorssr,by=(c("x","y")))%>%
   na.omit()
-
 haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
                       data=haerichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T, seed=seed[32])
-
 summary(haeSR)
 AIC(plasSR$gam.final)
+#Plots
+ggplot(data=haerichness,aes(Host_richness,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")#Host richness
 
 #################################### RPD
-haerpd1000<-read.csv("haerpd100.csv",row.names = 1)%>%# Load measures of Haemoproteus RPD based on 1000 phylogenetic trees
+haerpd1000<-read.csv("haerpd100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("RPD",100),"x","y"))
 haepredictorsrpd<-haepredictors[,!names(haepredictors) %in%c("Human_footprint","Humanpopdens")]
-
 haerpd<-list()
 for (i in 1:100){
   haerpd[[i]]<-haerpd1000[c(i,101,102)]%>%merge(haepredictorsrpd,by=c("x","y"))%>%na.omit()
@@ -236,77 +114,21 @@ haegamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
                  data=as.data.frame(haerpd[[i]]), coords = c("x","y"),
                  max.stop = 1000, verbose = 2,non.stationary = T)
 }
-haerpdgamclass<-lapply(haegamrpd,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-haerpdnotfitted<-(which(haerpdgamclass$class!="geoGAM",T))
-if (length(haerpdnotfitted)>=1){
-  haegamrpd<-haegamrpd[-c(haerpdnotfitted)]
-}else{
-  haegamrpd<-haegamrpd
+pulldata(haegamrpd)
+#plots
+datahaerpd<-list()
+for (i in 1:100){
+  datahaerpd[[i]]<-cbind(haerpd[[i]],as.data.frame(rep(paste0("model",i),nrow(haerpd[[i]]))))
 }
-length(haegamrpd)
-haesumm<-list()
-haeaic<-list()
-haedevexplain<-list()
-haersq<-list()
-haesmoothtable<-list()
-haepredtable<-list()
-haeformula<-list()
-for(i in 1:length(haegamrpd)){
-  haesumm[i]<-summary(haegamrpd[[i]])
-  haeaic[[i]]<-AIC(haegamrpd[[i]]$gam.final)
-  haedevexplain[[i]]<-haesumm[[i]]$dev.expl
-  haersq[[i]]<-haesumm[[i]]$r.sq
-  haesmoothtable[[i]]<-haesumm[[i]]$s.table
-  haesmoothtable[[i]]<-cbind(haesmoothtable[[i]],as.data.frame(row.names(haesmoothtable[[i]])))
-  haepredtable[[i]]<-haesumm[[i]]$p.table
-  haeformula[[i]]<-haesumm[[i]]$formula
-}
-haeestimates<-haepredtable%>%plyr::ldply(rbind)
-haeaic<-haeaic%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haersq<-haersq%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haedevexplain<-haedevexplain%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haerpddata1<-cbind(haedevexplain,haersq,haeaic,haeestimates)
-names(haerpddata1)<-c("Dev_exp","rsq","aic","Estimate",   
-                     "Std_Error", "t_value","p_val")
-apply(haerpddata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(haerpddata1,2,sd)#
-
-haerpddata2<-haesmoothtable%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(haerpddata2)[c(4,5)]<-c("pval","variable")
-table(haerpddata2$variable)#How many times a predictor was fitted in the final (best) model
-haemeanedfrpd<-aggregate(haerpddata2$edf, list(haerpddata2$variable), FUN=mean)
-haesdedf<-aggregate(haerpddata2$edf, list(haerpddata2$variable), FUN=sd)
-haerpdedf<-list()
-for (i in 1:4){
-  haerpdedf[[i]]<-(paste0(round(haemeanedfrpd[i,2],3)," ± ",round(haesdedf[i,2],3)))
-}
-haerpdedf<-as.data.frame(do.call(rbind,haerpdedf))
-hameanrefdfrpd<-aggregate(haerpddata2$Ref.df, list(haerpddata2$variable), FUN=mean)
-haesdrefdf<-aggregate(haerpddata2$Ref.df, list(haerpddata2$variable), FUN=sd)
-haerefdf<-list()
-for (i in 1:4){
-  haerefdf[[i]]<-(paste0(round(hameanrefdfrpd[i,2],3)," ± ",round(haesdrefdf[i,2],3)))
-}
-haerefdf<-as.data.frame(do.call(rbind,haerefdf))
-haemeanfrpd<-aggregate(haerpddata2$F, list(haerpddata2$variable), FUN=mean)
-haesdfrpd<-aggregate(haerpddata2$F, list(haerpddata2$variable), FUN=sd)
-haefrpd<-list()
-for (i in 1:4){
-  haefrpd[[i]]<-(paste0(round(haemeanfrpd[i,2],3)," ± ",round(haesdfrpd[i,2],3)))
-}
-haefrpd<-as.data.frame(do.call(rbind,haefrpd))
-haemeanprpd<-aggregate(haerpddata2$pval, list(haerpddata2$variable), FUN=mean)
-haesdprpd<-aggregate(haerpddata2$pval, list(haerpddata2$variable), FUN=sd)
-haeprpd<-list()
-for (i in 1:4){
-  haeprpd[[i]]<-(paste0(round(haemeanprpd[i,2],3)," ± ",round(haesdprpd[i,2],3)))
-}
-haeprpd=as.data.frame(do.call(rbind,haeprpd))
-cbind(as.data.frame(haemeanprpd[1]),haerpdedf,haerefdf,haefrpd,haeprpd)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
+plotdatahaerpd<-do.call(rbind,datahaerpd)
+colnames(plotdatahaerpd)[ncol(plotdatahaerpd)]<-"model"
+ggplot(data=plotdatahaerpd,aes(PET,RPD))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#PET
 
 #################################### PSV
-haepsv100<-read.csv("haepsv100.csv",row.names = 1)%>%# Load measures of haemoproteus psv based on 1000 phylogenetic trees
+haepsv100<-read.csv("haepsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 haepsv<-list()
 for (i in 1:100){
@@ -316,274 +138,102 @@ doParallel::registerDoParallel(cl = my.cluster)
 haegampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
   geoGAM::geoGAM(response="psv", covariates = names(haepredictors[c(3:ncol(haepredictors))]),
                  data=as.data.frame(haepsv[[i]]), coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)
 }
-haepsvgamclass<-lapply(haegampsv,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-haepsvnotfitted<-(which(haepsvgamclass$class!="geoGAM",T))
-if (length(haepsvnotfitted)>=1){
-  haegampsv<-haegampsv[-c(haepsvnotfitted)]
-}else{
-  haegampsv<-haegampsv
+pulldata(haegampsv)
+#Plots
+datahaepsv<-list()
+for (i in 1:100){
+  datahaepsv[[i]]<-cbind(haepsv[[i]],as.data.frame(rep(paste0("model",i),nrow(haepsv[[i]]))))
 }
-length(haegampsv)#Total models fitted
-haesumm2<-list()
-haeaic2<-list()
-haedevexplain2<-list()
-haersq2<-list()
-haesmoothtable2<-list()
-haesmoothtable3<-list()
-haepredtable2<-list()
-haeformula2<-list()
-for(i in 1:length(haegampsv)){
-  haesumm2[i]<-summary(haegampsv[[i]])
-  haeaic2[[i]]<-AIC(haegampsv[[i]]$gam.final)
-  haedevexplain2[[i]]<-haesumm2[[i]]$dev.expl
-}
-for(i in 1:length(haegampsv)){
-  haersq2[[i]]<-haesumm2[[i]]$r.sq
-  haesmoothtable2[[i]]<-haesumm2[[i]]$s.table
-} 
-for(i in 1:length(haegampsv)){
-  haesmoothtable3[[i]]<-cbind(haesmoothtable2[[i]],as.data.frame(row.names(haesmoothtable2[[i]])))
-  haepredtable2[[i]]<-haesumm2[[i]]$p.table
-  haeformula2[[i]]<-haesumm2[[i]]$formula
-}
-haeestimates2<-haepredtable2%>%plyr::ldply(rbind)
-haeaic2<-haeaic2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haersq2<-haersq2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haedevexplain2<-haedevexplain2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-haepsvdata1<-cbind(haedevexplain2,haersq2,haeaic2,haeestimates2)
-names(haepsvdata1)<-c("Dev_exp","rsq","aic","Estimate",   
-                       "Std_Error", "t_value","p_val")
-apply(haepsvdata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(haepsvdata1,2,sd)#
-haepsvdata2<-haesmoothtable3%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(haepsvdata2)[c(4,5)]<-c("pval","variable")
-table(haepsvdata2$variable)#How many times a predictor was fitted in the final (best) model
-haepredspsv=length(unique(haepsvdata2$variable))
-haemeanedfpsv<-aggregate(haepsvdata2$edf, list(haepsvdata2$variable), FUN=mean)
-haesdedf2<-aggregate(haepsvdata2$edf, list(haepsvdata2$variable), FUN=sd)
-haepsvedf<-list()
-for (i in 1:haepredspsv){
-  haepsvedf[[i]]<-(paste0(round(haemeanedfpsv[i,2],3)," ± ",round(haesdedf2[i,2],3)))
-}
-haepsvedf<-as.data.frame(do.call(rbind,haepsvedf))
-hameanrefdfpsv<-aggregate(haepsvdata2$Ref.df, list(haepsvdata2$variable), FUN=mean)
-haesdrefdf2<-aggregate(haepsvdata2$Ref.df, list(haepsvdata2$variable), FUN=sd)
-haerefdf2<-list()
-for (i in 1:haepredspsv){
-  haerefdf2[[i]]<-(paste0(round(hameanrefdfpsv[i,2],3)," ± ",round(haesdrefdf2[i,2],3)))
-}
-haerefdf2<-as.data.frame(do.call(rbind,haerefdf2))
-haemeanfpsv<-aggregate(haepsvdata2$F, list(haepsvdata2$variable), FUN=mean)
-haesdfpsv<-aggregate(haepsvdata2$F, list(haepsvdata2$variable), FUN=sd)
-haefpsv<-list()
-for (i in 1:haepredspsv){
-  haefpsv[[i]]<-(paste0(round(haemeanfpsv[i,2],3)," ± ",round(haesdfpsv[i,2],3)))
-}
-haefpsv<-as.data.frame(do.call(rbind,haefpsv))
-haemeanppsv<-aggregate(haepsvdata2$pval, list(haepsvdata2$variable), FUN=mean)
-haesdppsv<-aggregate(haepsvdata2$pval, list(haepsvdata2$variable), FUN=sd)
-haeppsv<-list()
-for (i in 1:haepredspsv){
-  haeppsv[[i]]<-(paste0(round(haemeanppsv[i,2],3)," ± ",round(haesdppsv[i,2],3)))
-}
-haeppsv<-as.data.frame(do.call(rbind,haeppsv))
-cbind(as.data.frame(haemeanppsv[1]),haepsvedf,haerefdf2,haefpsv,haeppsv)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
-
-
+plotdatahaepsv<-do.call(rbind,datahaepsv)
+colnames(plotdatahaepsv)[ncol(plotdatahaepsv)]<-"model"
+ggplot(data=plotdatahaepsv,aes(Human_footprint,psv))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#Human footprint
 
 # Leucocytozoon ####
-leupredictors<-read.csv("leupredictors.csv",row.names=1)#load predictors dataset 
-#################################### RPD 
-
-leurpd100<-read.csv("leurpd100.csv",row.names = 1)%>%# Load measures of leumoproteus RPD based on 1000 phylogenetic trees
-  purrr::set_names(c(rep("RPD",100),"x","y"))
-leupredictors1<-leupredictors[,!names(leupredictors) %in%c("Rain_seasonality","Precipitation","Ec.Het")]
-leurpd<-list()
-for (i in 1:100){
-  leurpd[[i]]<-leurpd100[c(i,101,102)]%>%merge(leupredictors1,by=c("x","y"))%>%na.omit()
-}
-
-doParallel::registerDoParallel(cl = my.cluster)
-leugamrpd<-foreach::foreach(i = c(1:100),.errorhandling = 'pass')%dopar%{
-  geoGAM::geoGAM(response="RPD", covariates = names(leupredictors1[3:ncol(leupredictors1)]),
-                 data=as.data.frame(leurpd[[i]]), coords = c("x","y"),
-                 max.stop = 1000,non.stationary = T,seed=seed[[i]])
-}
-leurpdgamclass<-lapply(leugamrpd,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-leurpdnotfitted<-(which(leurpdgamclass$class!="geoGAM",T))
-leugamrpd<-leugamrpd[-c(leurpdnotfitted)]
-length(leugamrpd)#Total models fitted
-leusumm<-list()
-leuaic<-list()
-leudevexplain<-list()
-leursq<-list()
-leusmoothtable<-list()
-leupredtable<-list()
-leuformula<-list()
-for(i in 1:length(leugamrpd)){
-  leusumm[i]<-summary(leugamrpd[[i]])
-  leuaic[[i]]<-AIC(leugamrpd[[i]]$gam.final)
-  leudevexplain[[i]]<-leusumm[[i]]$dev.expl
-}
-for(i in 1:length(leugamrpd)){
-  leursq[[i]]<-leusumm[[i]]$r.sq
-  leusmoothtable[[i]]<-leusumm[[i]]$s.table
-}
-for(i in 1:length(leugamrpd)){
-  leusmoothtable[[i]]<-cbind(leusmoothtable[[i]],as.data.frame(row.names(leusmoothtable[[i]])))
-  leupredtable[[i]]<-leusumm[[i]]$p.table
-  leuformula[[i]]<-leusumm[[i]]$formula
-}
-
-leuestimates<-leupredtable%>%plyr::ldply(rbind)
-leuaic<-leuaic%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leursq<-leursq%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leudevexplain<-leudevexplain%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leurpddata1<-cbind(leudevexplain,leursq,leuaic,leuestimates)
-names(leurpddata1)=c("Dev_exp","rsq","aic","Estimate",   
-                     "Std_Error", "t_value","p_val")
-
-apply(leurpddata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(leurpddata1,2,sd)#
-
-leurpddata2<-leusmoothtable%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(leurpddata2)[c(4,5)]<-c("pval","variable")
-table(leurpddata2$variable)#How many times a predictor was fitted in the final (best) model
-
-leumeanedfrpd<-aggregate(leurpddata2$edf, list(leurpddata2$variable), FUN=mean)
-leusdedf<-aggregate(leurpddata2$edf, list(leurpddata2$variable), FUN=sd)
-leupreds=length(unique(leurpddata2$variable))
-leurpdedf<-list()
-for (i in 1:leupreds){
-  leurpdedf[[i]]<-(paste0(round(leumeanedfrpd[i,2],3)," ± ",round(leusdedf[i,2],3)))
-}
-leurpdedf<-as.data.frame(do.call(rbind,leurpdedf))
-hameanrefdfrpd<-aggregate(leurpddata2$Ref.df, list(leurpddata2$variable), FUN=mean)
-leusdrefdf<-aggregate(leurpddata2$Ref.df, list(leurpddata2$variable), FUN=sd)
-leurefdf<-list()
-for (i in 1:leupreds){
-  leurefdf[[i]]<-(paste0(round(hameanrefdfrpd[i,2],3)," ± ",round(leusdrefdf[i,2],3)))
-}
-leurefdf<-as.data.frame(do.call(rbind,leurefdf))
-leumeanfrpd<-aggregate(leurpddata2$F, list(leurpddata2$variable), FUN=mean)
-leusdfrpd<-aggregate(leurpddata2$F, list(leurpddata2$variable), FUN=sd)
-leufrpd<-list()
-for (i in 1:leupreds){
-  leufrpd[[i]]<-(paste0(round(leumeanfrpd[i,2],3)," ± ",round(leusdfrpd[i,2],3)))
-}
-leufrpd<-as.data.frame(do.call(rbind,leufrpd))
-leumeanprpd<-aggregate(leurpddata2$pval, list(leurpddata2$variable), FUN=mean)
-leusdprpd<-aggregate(leurpddata2$pval, list(leurpddata2$variable), FUN=sd)
-leuprpd<-list()
-for (i in 1:leupreds){
-  leuprpd[[i]]<-(paste0(round(leumeanprpd[i,2],3)," ± ",round(leusdprpd[i,2],3)))
-}
-leuprpd<-as.data.frame(do.call(rbind,leuprpd))
-cbind(as.data.frame(leumeanprpd[1]),leurpdedf,leurefdf,leufrpd,leuprpd)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
-#################################### PSV 
-
-leupsv100<-read.csv("leupsv100.csv",row.names = 1)%>%# Load measures of leumoproteus psv based on 1000 phylogenetic trees
-  purrr::set_names(c(rep("psv",100),"x","y"))
-leupredictors2=leupredictors[,!names(leupredictors) %in%c(
-  "Humanpopdens","Host_richness")]
-leupsv<-list()
-for (i in 1:100){
-  leupsv[[i]]<-leupsv100[c(i,101,102)]%>%merge(leupredictors2,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-leugampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
-  geoGAM::geoGAM(response="psv", covariates = names(leupredictors2[c(3:ncol(leupredictors2))]),
-                 data=leupsv[[i]], coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
-}
-leupsvgamclass<-lapply(leugampsv,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
-leupsvnotfitted<-(which(leupsvgamclass$class!="geoGAM",T))
-if (length(leupsvnotfitted)>=1){
-  leugampsv<-leugampsv[-c(leupsvnotfitted)]
-  }else{
-    leugampsv<-leugampsv
-}
-length(leugampsv)#Total models fitted
-
-leusumm2<-list()
-leuaic2<-list()
-leudevexplain2<-list()
-leursq2<-list()
-leusmoothtable2<-list()
-leusmoothtable3<-list()
-leupredtable2<-list()
-leuformula2<-list()
-for(i in 1:length(leugampsv)){
-  leusumm2[i]<-summary(leugampsv[[i]])
-  leuaic2[[i]]<-AIC(leugampsv[[i]]$gam.final)
-  leudevexplain2[[i]]<-leusumm2[[i]]$dev.expl
-}
-for(i in 1:length(leugampsv)){
-  leursq2[[i]]<-leusumm2[[i]]$r.sq
-  leusmoothtable2[[i]]<-leusumm2[[i]]$s.table
-} 
-for(i in 1:length(leugampsv)){
-  leusmoothtable3[[i]]<-cbind(leusmoothtable2[[i]],as.data.frame(row.names(leusmoothtable2[[i]])))
-  leupredtable2[[i]]<-leusumm2[[i]]$p.table
-  leuformula2[[i]]<-leusumm2[[i]]$formula
-}
-leuestimates2<-leupredtable2%>%plyr::ldply(rbind)
-leuaic2<-leuaic2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leursq2<-leursq2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leudevexplain2<-leudevexplain2%>%plyr::ldply(as.numeric)%>%as.data.frame()
-leupsvdata1<-cbind(leudevexplain2,leursq2,leuaic2,leuestimates2)
-names(leupsvdata1)<-c("Dev_exp","rsq","aic","Estimate",   
-                      "Std_Error", "t_value","p_val")
-apply(leupsvdata1,2,mean)#overall model (1:3) and intercept data(4:7)
-apply(leupsvdata1,2,sd)#
-leupsvdata2<-leusmoothtable3%>%plyr::ldply(rbind)%>%as.data.frame()
-colnames(leupsvdata2)[c(4,5)]<-c("pval","variable")
-table(leupsvdata2$variable)#How many times a predictor was fitted in the final (best) model
-leupsvpreds=length(unique(leupsvdata2$variable))
-leumeanedfpsv<-aggregate(leupsvdata2$edf, list(leupsvdata2$variable), FUN=mean)
-leusdedf2<-aggregate(leupsvdata2$edf, list(leupsvdata2$variable), FUN=sd)
-leupsvedf<-list()
-for (i in 1:leupsvpreds){
-  leupsvedf[[i]]<-(paste0(round(leumeanedfpsv[i,2],3)," ± ",round(leusdedf2[i,2],3)))
-}
-leupsvedf<-as.data.frame(do.call(rbind,leupsvedf))
-hameanrefdfpsv<-aggregate(leupsvdata2$Ref.df, list(leupsvdata2$variable), FUN=mean)
-leusdrefdf2<-aggregate(leupsvdata2$Ref.df, list(leupsvdata2$variable), FUN=sd)
-leurefdf2<-list()
-for (i in 1:leupsvpreds){
-  leurefdf2[[i]]<-(paste0(round(hameanrefdfpsv[i,2],3)," ± ",round(leusdrefdf2[i,2],3)))
-}
-leurefdf2<-as.data.frame(do.call(rbind,leurefdf2))
-leumeanfpsv<-aggregate(leupsvdata2$F, list(leupsvdata2$variable), FUN=mean)
-leusdfpsv<-aggregate(leupsvdata2$F, list(leupsvdata2$variable), FUN=sd)
-leufpsv<-list()
-for (i in 1:leupsvpreds){
-  leufpsv[[i]]<-(paste0(round(leumeanfpsv[i,2],3)," ± ",round(leusdfpsv[i,2],3)))
-}
-leufpsv<-as.data.frame(do.call(rbind,leufpsv))
-leumeanppsv<-aggregate(leupsvdata2$pval, list(leupsvdata2$variable), FUN=mean)
-leusdppsv<-aggregate(leupsvdata2$pval, list(leupsvdata2$variable), FUN=sd)
-leuppsv<-list()
-for (i in 1:leupsvpreds){
-  leuppsv[[i]]<-(paste0(round(leumeanppsv[i,2],3)," ± ",round(leusdppsv[i,2],3)))
-}
-leuppsv<-as.data.frame(do.call(rbind,leuppsv))
-cbind(as.data.frame(leumeanppsv[1]),leupsvedf,leupsvedf,leufpsv,leuppsv)%>%
-  purrr::set_names("predictor","edf","ref.df","f","p")
-
+leupredictors<-read.csv("leupredictors.csv",row.names=1)
 #################################### SR
-leupresab<-read.csv("leucocytozoonPAM",row.names = 1)#Load parasite presence absense matrices
+leupresab<-read.csv("leucocytozoonPAM",row.names = 1)
+leupredictorssr<-leupredictors[,!names(leupredictors) %in%c("Ec.Het")]
 leurichness<-leupresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(leupresab[c("x","y")])%>%merge(leupredictors,by=(c("x","y")))%>%
+  purrr::set_names("SR")%>%cbind(leupresab[c("x","y")])%>%merge(leupredictorssr,by=(c("x","y")))%>%
   na.omit()
-
 leuSR<-geoGAM::geoGAM(response="SR", covariates = (names(leurichness[,c(4:ncol(leurichness))])),
                       data=leurichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T,seed=seed[3])
-
 summary(leuSR)
 AIC(leuSR$gam.final)
+
+#Plots
+ggplot(data=leurichness,aes(Host_richness,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")#Host rchness
+ggplot(data=leurichness,aes(Temperature,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")#Temperature
+ggplot(data=leurichness,aes(Degree_of_generalism,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")#Degree of generalism
+
+#################################### RPD 
+leurpd100<-read.csv("leurpd100.csv",row.names = 1)%>%
+  purrr::set_names(c(rep("RPD",100),"x","y"))
+leupredictorsrpd<-leupredictors[,!names(leupredictors) %in%c("EVI","Temperature","Temperature_seasonality")]
+leurpd<-list()
+for (i in 1:100){
+  leurpd[[i]]<-leurpd100[c(i,101,102)]%>%merge(leupredictorsrpd,by=c("x","y"))%>%na.omit()
+}
+doParallel::registerDoParallel(cl = my.cluster)
+leugamrpd<-foreach::foreach(i = c(1:100),.errorhandling = 'pass')%dopar%{
+  geoGAM::geoGAM(response="RPD", covariates = names(leupredictorsrpd[3:ncol(leupredictorsrpd)]),
+                 data=as.data.frame(leurpd[[i]]), coords = c("x","y"),
+                 max.stop = 1000,non.stationary = T)
+}
+pulldata(leugamrpd)
+
+#Plots
+dataleurpd<-list()
+for (i in 1:100){
+  dataleurpd[[i]]<-cbind(leurpd[[i]],as.data.frame(rep(paste0("model",i),nrow(leurpd[[i]]))))
+}
+plotdataleurpd<-do.call(rbind,dataleurpd)
+colnames(plotdataleurpd)[ncol(plotdataleurpd)]<-"model"
+ggplot(data=plotdataleurpd,aes(Degree_of_generalism,RPD))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#Degree of generalism
+
+#################################### PSV 
+leupsv100<-read.csv("leupsv100.csv",row.names = 1)%>%
+  purrr::set_names(c(rep("psv",100),"x","y"))
+leupredictorspsv=leupredictors[,!names(leupredictors) %in%c(
+  "HUman_footprint","Humanpopdens","Host_richness"."PET")]
+leupsv<-list()
+for (i in 1:100){
+  leupsv[[i]]<-leupsv100[c(i,101,102)]%>%merge(leupredictorspsv,by=c("x","y"))%>%na.omit()
+}
+doParallel::registerDoParallel(cl = my.cluster)
+leugampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
+  geoGAM::geoGAM(response="psv", covariates = names(leupredictorspsv[c(3:ncol(leupredictorspsv))]),
+                 data=leupsv[[i]], coords = c("x","y"),
+                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+}
+pulldata(leugampsv)
+
+#Plots
+dataleupsv<-list()
+for (i in 1:100){
+  dataleupsv[[i]]<-cbind(leupsv[[i]],as.data.frame(rep(paste0("model",i),nrow(leupsv[[i]]))))
+}
+plotdataleupsv<-do.call(rbind,dataleupsv)
+colnames(plotdataleupsv)[ncol(plotdataleupsv)]<-"model"
+ggplot(data=plotdataleupsv,aes(Degree_of_generalism,psv))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#Degree of generalism
