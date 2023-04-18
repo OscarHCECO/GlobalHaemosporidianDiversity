@@ -55,9 +55,6 @@ for (i in 1:100){
   haepsvxy[[i]]<-haepsv[c(i,101,102)]
   haepsvdf[[i]]<-haepsvxy[[i]]%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 haepsvvarimp<-foreach::foreach(i = 1:100)%dopar%{
   caret::train(psv~.,modelType="gam",metric="Rsquared",data=haepsvdf[[i]],
@@ -96,9 +93,6 @@ for (i in 1:100){
   plasrpdxy[[i]]<-plasrpd[c(i,101,102)]
   plasrpddf[[i]]<-plasrpdxy[[i]]%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 plasrpdvarimp=foreach::foreach(i = 1:100)%dopar%{
   caret::train(RPD~.,modelType="gam",metric="Rsquared",data=plasrpddf[[i]],
@@ -124,9 +118,6 @@ for (i in 1:100){
   plaspsvxy[[i]]<-plaspsv[c(i,101,102)]
   plaspsvdf[[i]]<-plaspsvxy[[i]]%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 plaspsvvarimp<-foreach::foreach(i = 1:100)%dopar%{
   caret::train(psv~.,modelType="gam",metric="Rsquared",data=plaspsvdf[[i]],
@@ -168,9 +159,6 @@ for (i in 1:100){
   leurpdxy[[i]]<-leurpd[c(i,101,102)]
   leurpddf[[i]]<-leurpdxy[[i]]%>%merge(leupredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 leurpdvarimp=foreach::foreach(i = 1:100)%dopar%{
   caret::train(RPD~.,modelType="gam",metric="Rsquared",data=leurpddf[[i]],

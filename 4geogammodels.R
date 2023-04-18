@@ -50,7 +50,7 @@ plasgamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
                  data=as.data.frame(plasrpd[[i]]), coords = c("x","y"),
                  max.stop = 1000, verbose = 2,non.stationary = T)#Perform 100 geogam model building procedures
 }
-pulldata(plasgamrpd)#Sumarizes data from the 100 models (you have to load this function to your workspace from "pulldatafunction" script)
+pulldata(plasgamrpd)#Summarizes data from the 100 models (you have to load this function to your workspace from "pulldatafunction" script)
 
 #################################### PSV
 plaspsv100<-read.csv("plaspsv100.csv",row.names = 1)%>%# Load measures of Plasmodium psv based on 100 phylogenetic trees
