@@ -15,10 +15,15 @@ control <- trainControl(method = 'repeatedcv',# Train control model to identify 
                         number = 10,
                         repeats = 1000,
                         search = 'grid')
+ncores=detectCores()-1
+my.cluster <- parallel::makeCluster(
+  ncores, 
+  type = "PSOCK"
+)
 #Haemoproteus ####
-haepredictors=read.csv("haepredictors.csv",row.names=1)#load dataset with predictors  
+haepredictors<-read.csv("haepredictors.csv",row.names=1)#load dataset with predictors  
 #Haemoproteus RPD
-haerpd=read.csv("haerpd100.csv",row.names = 1)%>%# Load measures of RPD for Haemoproteus  (based on 100 phylogenetic trees)
+haerpd<-read.csv("haerpd100.csv",row.names = 1)%>%# Load measures of RPD for Haemoproteus  (based on 100 phylogenetic trees)
   purrr::set_names(c(rep("RPD",100),"x","y"))
 haerpdxy<-list()
 haerpddf<-list()
@@ -26,9 +31,6 @@ for (i in 1:100){
   haerpdxy[[i]]<-haerpd[c(i,101,102)]
   haerpddf[[i]]<-haerpdxy[[i]]%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 haerpdvarimp<-foreach::foreach(i = 1:100)%dopar%{
   caret::train(RPD~.,modelType="gam",metric="Rsquared",data=haerpddf[[i]],
@@ -71,7 +73,7 @@ for(i in 1:100){
                                        names   = rownames(haepsvvarimpsc[[i]]$importance))
   haepsvvarimpscore[[i]]<-haepsvvarimpscore[[i]][order(haepsvvarimpscore[[i]]$names,decreasing=T),]
 }
-haepsvvarimpscoredf=haepsvvarimpscore%>%plyr::ldply(rbind)
+haepsvvarimpscoredf<-haepsvvarimpscore%>%plyr::ldply(rbind)
 # Hemoproteus richness
 haepresab<-read.csv("haemoproteusPAM",row.names = 1)
 haerichness=sqrt(as.data.frame(rowSums(haepresab[5:ncol(haepresab)])))%>%purrr::set_names("SR")%>%
@@ -174,7 +176,7 @@ leurpdvarimp=foreach::foreach(i = 1:100)%dopar%{
   caret::train(RPD~.,modelType="gam",metric="Rsquared",data=leurpddf[[i]],
                control=control,family = "gaussian")                          
 }
-leurpdvarimpsc=list()
+leurpdvarimpsc<-list()
 leurpdvarimpscore<-list()
 for(i in 1:100){
   leurpdvarimpsc[[i]]<-caret::varImp(leurpdvarimp[[i]],scale=T)
@@ -194,9 +196,6 @@ for (i in 1:100){
   leupsvxy[[i]]<-leupsv[c(i,101,102)]
   leupsvdf[[i]]<-leupsvxy[[i]]%>%merge(leupredictors,by=c("x","y"))%>%na.omit()
 }
-my.cluster <- parallel::makeCluster(
-  6, 
-  type = "PSOCK")
 doParallel::registerDoParallel(cl = my.cluster)
 leupsvvarimp=foreach::foreach(i = 1:100)%dopar%{
   caret::train(psv~.,modelType="gam",metric="Rsquared",data=leupsvdf[[i]],
@@ -232,132 +231,84 @@ leusrvarimpscore<-leusrvarimpscore[order(leusrvarimpscore$names,decreasing=T),]
 #############################################################################################################
 
 # SR varimp ####
-dataimpsr=rbind(plassrvarimpscore,haesrvarimpscore,leusrvarimpscore)
-genus=c(rep("Plasmodium",length(rownames(plassrvarimpscore))),rep("Haemoproteus",length(rownames(plassrvarimpscore))),
+dataimpsr<-rbind(plassrvarimpscore,haesrvarimpscore,leusrvarimpscore)
+genus<-c(rep("Plasmodium",length(rownames(plassrvarimpscore))),rep("Haemoproteus",length(rownames(plassrvarimpscore))),
         rep("Leucocytozoon",length(rownames(plassrvarimpscore))))
-catsr=rev(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-catsr=rep(catsr,3)
-srdf1=cbind(dataimpsr,genus,catsr)
-srdf1=srdf1[order(srdf1$catsr, decreasing = TRUE), ]
-order=c("Temperature_seasonality","Rain_seasonality","Temperature","Precipitation","PET","EVI","Ec.Het","Host_richness","Degree_of_generalism",
-        "Humanpopdens","Human_footprint","y","x")
-labels=c("Temperature seasonality","Rain seasonality","Temperature","Precipitation","PET","EVI","Ecosystem heterogeneity",
-         "Host richness","Degree of generalism","Human population density","Human footprint","y","x")
-genera=c("Plasmodium","Haemoproteus","Leucocytozoon")
+catsr<-rev(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
+catsr<-rep(catsr,3)
+srdf1<-cbind(dataimpsr,genus,catsr)
+srdf1<-srdf1[order(srdf1$catsr, decreasing = TRUE), ]
+genera<-c("Plasmodium","Haemoproteus","Leucocytozoon")
 
-A=ggplot(data=srdf1,aes(overall,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=srdf1,aes(overall,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
   geom_bar(stat="identity",position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(a) SR")+
-  theme(plot.title = element_text(hjust = 0.05,face="bold"))+
-  scale_fill_manual(values = c("Plasmodium"="#88CCEE","Haemoproteus"="#AA4499","Leucocytozoon"="#888888"),
-                    labels = c(expression(italic("Plasmodium")),
-                               expression(italic("Haemoproteus")),
-                               expression(italic("Leucocytozoon"))),name="Genus")+
-  scale_x_continuous(name ="mean Importance Score")+theme(axis.text.x = element_text(face="bold", 
-                                                                                     size=10),
-                                                          axis.text.y = element_text( 
-                                                            size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels)
-
+  ggtitle("(a) SR")
+  
 #RPD varimp ####
-plasimprpdmean=aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=mean)
-plasimprpdsd=aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=sd)
-plasimprpddf=merge(plasimprpdmean,plasimprpdsd,by="Group.1")
-names(plasimprpddf)=c("names","mean","sd")
-plasimprpddf=plasimprpddf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimprpddf)))))
-haeimprpdmean=aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=mean)
-haeimprpdsd=aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=sd)
-haeimprpddf=merge(haeimprpdmean,haeimprpdsd,by="Group.1")
-names(haeimprpddf)=c("names","mean","sd")
-haeimprpddf=haeimprpddf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimprpddf)))))
-leuimprpdmean=aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=mean)
-leuimprpdsd=aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=sd)
-leuimprpddf=merge(leuimprpdmean,leuimprpdsd,by="Group.1")
+plasimprpdmean<-aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=mean)
+plasimprpdsd<-aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=sd)
+plasimprpddf<-merge(plasimprpdmean,plasimprpdsd,by="Group.1")
+names(plasimprpddf)<-c("names","mean","sd")
+plasimprpddf<-plasimprpddf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimprpddf)))))
+haeimprpdmean<-aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=mean)
+haeimprpdsd<-aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=sd)
+haeimprpddf<-merge(haeimprpdmean,haeimprpdsd,by="Group.1")
+names(haeimprpddf)<-c("names","mean","sd")
+haeimprpddf<-haeimprpddf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimprpddf)))))
+leuimprpdmean<-aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=mean)
+leuimprpdsd<-aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=sd)
+leuimprpddf<-merge(leuimprpdmean,leuimprpdsd,by="Group.1")
 names(leuimprpddf)=c("names","mean","sd")
-leuimprpddf=leuimprpddf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimprpddf)))))
-dataimprdp=rbind(plasimprpddf,haeimprpddf,leuimprpddf)
+leuimprpddf<-leuimprpddf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimprpddf)))))
+dataimprdp<-rbind(plasimprpddf,haeimprpddf,leuimprpddf)
 bardataimprdpsdup<-as.data.frame(dataimprdp$mean+dataimprdp$sd)
-names(bardataimprdpsdup)="upper"
+names(bardataimprdpsdup)<-"upper"
 bardataimprdpsdown<-as.data.frame(dataimprdp$mean-dataimprdp$sd)
 names(bardataimprdpsdown)<-"lower"
-dfrpdimp=cbind(dataimprdp,bardataimprdpsdown,bardataimprdpsdup)
-cat=(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-cat=rep(cat,3)
-df1=cbind(dfrpdimp,cat)
-df1=df1[order(df1$cat, decreasing = TRUE), ]
-order=c("Temperatire_seasonality","Rain_seasonality","Temperature","Precipitation","PET","EVI","Ec.Het","Host_richness","Degree_of_generalism",
-        "Humanpopdens","Human_footprint","y","x")
-labels=c("Temperature seasonality","Rain seasonality","Temperature","Precipitation","PET","EVI","Ecosystem heterogeneity",
-         "Host richness","Degree of generalism","Human population density","Human footprint","y","x")
-genera=c("Plasmodium","Haemoproteus","Leucocytozoon")
+dfrpdimp<-cbind(dataimprdp,bardataimprdpsdown,bardataimprdpsdup)
+cat<-(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
+cat<-rep(cat,3)
+df1<-cbind(dfrpdimp,cat)
+df1<-df1[order(df1$cat, decreasing = TRUE), ]
 
-B<-ggplot(data=df1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=df1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(b) RPD")+
-  theme(plot.title = element_text(hjust = 0.05,face="bold"))+
-  scale_fill_manual(values = c("Plasmodium"="#88CCEE","Haemoproteus"="#AA4499","Leucocytozoon"="#888888"),
-                    labels = c(expression(italic("Plasmodium")),
-                               expression(italic("Haemoproteus")),
-                               expression(italic("Leucocytozoon"))),name="Genus")+
-  scale_x_continuous(name ="mean Importance Score")+theme(axis.text.x = element_text(face="bold", 
-                                                                                     size=10),
-                                                          axis.text.y = element_text( 
-                                                            size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels) 
+  ggtitle("(b) RPD")
 
 #PSV varimp ####
-
-plasimppsvmean=aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=mean)
-plasimppsvsd=aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=sd)
-plasimppsvdf=merge(plasimppsvmean,plasimppsvsd,by="Group.1")
-names(plasimppsvdf)=c("names","mean","sd")
-plasimppsvdf=plasimppsvdf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimppsvdf)))))
-haeimppsvmean=aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=mean)
-haeimppsvsd=aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=sd)
+plasimppsvmean<-aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=mean)
+plasimppsvsd<-aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=sd)
+plasimppsvdf<-merge(plasimppsvmean,plasimppsvsd,by="Group.1")
+names(plasimppsvdf)<-c("names","mean","sd")
+plasimppsvdf<-plasimppsvdf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimppsvdf)))))
+haeimppsvmean<-aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=mean)
+haeimppsvsd<-aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=sd)
 haeimppsvdf=merge(haeimppsvmean,haeimppsvsd,by="Group.1")
-names(haeimppsvdf)=c("names","mean","sd")
-haeimppsvdf=haeimppsvdf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimppsvdf)))))
-leuimppsvmean=aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=mean)
-leuimppsvsd=aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=sd)
-leuimppsvdf=merge(leuimppsvmean,leuimppsvsd,by="Group.1")
-names(leuimppsvdf)=c("names","mean","sd")
-leuimppsvdf=leuimppsvdf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimppsvdf)))))
-dataimppsv=rbind(plasimppsvdf,haeimppsvdf,leuimppsvdf)
+names(haeimppsvdf)<-c("names","mean","sd")
+haeimppsvdf<-haeimppsvdf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimppsvdf)))))
+leuimppsvmean<-aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=mean)
+leuimppsvsd<-aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=sd)
+leuimppsvdf<-merge(leuimppsvmean,leuimppsvsd,by="Group.1")
+names(leuimppsvdf)<-c("names","mean","sd")
+leuimppsvdf<-leuimppsvdf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimppsvdf)))))
+dataimppsv<-rbind(plasimppsvdf,haeimppsvdf,leuimppsvdf)
 bardataimppsvsdup<-as.data.frame(dataimppsv$mean+dataimppsv$sd)
-names(bardataimppsvsdup)="upper"
+names(bardataimppsvsdup)<-"upper"
 bardataimppsvsdown<-as.data.frame(dataimppsv$mean-dataimppsv$sd)
 names(bardataimppsvsdown)<-"lower"
-dfpsvimp=cbind(dataimppsv,bardataimppsvsdown,bardataimppsvsdup)
-cat=(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-cat=rep(cat,3)
-psvdf1=cbind(dfpsvimp,cat)
-psvdf1=psvdf1[order(psvdf1$cat, decreasing = TRUE), ]
-order=c("Temperature_seasonality","Rain_seasonality","Temperature","Precipitation","PET","EVI","Ec.Het","Host_richness",
-        "Degree_of_generalism","Humanpopdens","Human_footprint","y","x")
-labels=c("Temperature seasonality","Rain seasonality","Anual temperature","Anual rainfall","PET","EVI","Ecosystem heterogeneity",
-         "Host richness","Degree of generalism","Human population density","Human footprint","y","x")
-genera=c("Plasmodium","Haemoproteus","Leucocytozoon")
+dfpsvimp<-cbind(dataimppsv,bardataimppsvsdown,bardataimppsvsdup)
+cat<-(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
+cat<-rep(cat,3)
+psvdf1<-cbind(dfpsvimp,cat)
+psvdf1<-psvdf1[order(psvdf1$cat, decreasing = TRUE), ]
 
-C=ggplot(data=psvdf1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
+ggplot(data=psvdf1,aes(mean,factor(names,level=(order)),fill=factor(genus,level=(genera))))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(c) PSV")+
-  theme(plot.title = element_text(hjust = 0.05,face="bold"))+
-  scale_fill_manual(values = c("Plasmodium"="#88CCEE","Haemoproteus"="#AA4499","Leucocytozoon"="#888888"),
-                    labels = c(expression(italic("Plasmodium")),
-                               expression(italic("Haemoproteus")),
-                               expression(italic("Leucocytozoon"))),name="Genus")+
-  scale_x_continuous(name ="mean Importance Score")+theme(axis.text.x = element_text(face="bold", 
-                                                                                     size=10),
-                                                          axis.text.y = element_text( 
-                                                            size=10),axis.title=element_text(size=10,face="bold"))+
-  scale_y_discrete(name ="Predictors",labels=labels)
-
-
-
+  ggtitle("(c) PSV")
 
 

@@ -4,23 +4,24 @@ library(doParallel)
 library(parallel)
 library(foreach)
 library(mgcv)
-#In this script, we calculate phylogenetic metrics (RPD and PSV) from  100 mcc trees for each genus
+#In this script, we will calculate phylogenetic metrics (RPD and PSV) from  100 mcc trees for each genus
 # Plasmodium ####
-plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absense matrices
+plaspresab<-read.csv("plasmodiumPAM",row.names = 1)#Load parasite presence absence matrices
 plastrr<-read.tree("plasmcctrees")#load trees
-my.cluster <- parallel::makeCluster(#Activate cluster to do it in paralell
-  6,   # number of available cores  
+ncores=detectCores()-1
+my.cluster <- parallel::makeCluster(
+  ncores, 
   type = "PSOCK"
 )
 doParallel::registerDoParallel(cl = my.cluster)
 plasnewdata<-foreach::foreach(i = 1:100)%dopar%{#Prepare data matching names in the tree and names in assemblage matrix
   picante::match.phylo.comm(plastrr[[i]],plaspresab)                          
 }
-plaspsv<-foreach::foreach(i = 1:100)%dopar%{ #PSV for Plasmodium
+plaspsv<-foreach::foreach(i = 1:100)%dopar%{ # Plasmodium PSV 
   picante::psd(plasnewdata[[i]]$comm,plasnewdata[[i]]$phy, compute.var=T,scale.vcv=T)
 } 
 plaspd<-foreach::foreach(i = 1:100)%dopar%{
-  picante::pd(plasnewdata[[i]]$comm,plasnewdata[[i]]$phy)#PD for Plasmodium
+  picante::pd(plasnewdata[[i]]$comm,plasnewdata[[i]]$phy)#Plasmodium PD 
 }
 plaspsvdef<-list()
 for(i in 1:100){
@@ -28,32 +29,26 @@ for(i in 1:100){
 }
 plaspsv100<-do.call(cbind, plaspsvdef)
 plaspsv100df<-plaspsv100%>%cbind(plaspresab[c("x","y")])
-write.csv(plaspsv100df,"plaspsv100.csv")#Save PSV for Plasmodium assemblages
+write.csv(plaspsv100df,"plaspsv100.csv")#Save PSV of Plasmodium assemblages
 plaspddef<-list()
 for(i in 1:100){
   plaspddef[[i]]<-plaspd[[i]]%>%dplyr::select("PD")
 }
-plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()#SR for Plasmodium
+plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()#SR Plasmodium
 names(plasrichness)<-c("SR")
 plaspd100<-do.call(cbind, plaspddef)
 dataplas<-list()
 plasrpd<-list()
 for (i in 1:100){
   dataplas[[i]]<-plaspd100[c(i)]%>%cbind(plasrichness,(plaspresab[c("x","y")]))%>%na.omit()
-  plasrpd[[i]]<-as.data.frame(resid(gam(PD~s((SR)),data=dataplas[[i]]))) #RPD for Plasmodium as residuals of gam regression 
+  plasrpd[[i]]<-as.data.frame(resid(gam(PD~s((SR)),data=dataplas[[i]]))) #Plasmodium RPD as residuals of gam regression 
 }
 plasrpd100<-do.call(cbind, plasrpd)
 plasrpd100df<-plasrpd100%>%cbind(dataplas[[1]][c(3,4)])
 names(plasrpd100df)=c(rep("RPD",100),"x","y")
-write.csv(plasrpd100df,"plasrpd100.csv")#Save RPD for Plasmodium assemblages
+write.csv(plasrpd100df,"plasrpd100.csv")#Save Plasmodium RPD 
 # Haemoproteus ####
 haepresab<-read.csv("haemoproteusPAM",row.names = 1)
-#Load data ####
-haetrr<-read.tree("haemcctrees")
-my.cluster <- parallel::makeCluster(
-  6,   
-  type = "PSOCK"
-)
 doParallel::registerDoParallel(cl = my.cluster)
 haenewdata<-foreach::foreach(i = 1:100)%dopar%{
   picante::match.phylo.comm(haetrr[[i]],haepresab)                          
@@ -90,12 +85,8 @@ names(haerpd100df)<-c(rep("RPD",100),"x","y")
 write.csv(haerpd100df,"haerpd100.csv")
 # Leucocytozoon ####
 leupresab<-read.csv("leucocytozoonPAM",row.names = 1)
-#Load data ####
+#Load data 
 leutrr<-read.tree("leumcctrees")
-my.cluster <- parallel::makeCluster(
-  6,   
-  type = "PSOCK"
-)
 doParallel::registerDoParallel(cl = my.cluster)
 leunewdata<-foreach::foreach(i = 1:100)%dopar%{
   picante::match.phylo.comm(leutrr[[i]],leupresab)                          
