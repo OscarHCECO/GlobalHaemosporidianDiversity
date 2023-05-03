@@ -94,7 +94,7 @@ haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(h
                       data=haerichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T)
 summary(haeSR)
-AIC(plasSR$gam.final)
+AIC(haeSR$gam.final)
 #Plots
 ggplot(data=haerichness,aes(Host_richness,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
@@ -215,7 +215,7 @@ ggplot(data=plotdataleurpd,aes(Degree_of_generalism,RPD))+
 leupsv100<-read.csv("leupsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 leupredictorspsv=leupredictors[,!names(leupredictors) %in%c(
-  "HUman_footprint","Humanpopdens","Host_richness","PET")]
+  "Human_footprint","Humanpopdens","Host_richness","PET")]
 leupsv<-list()
 for (i in 1:100){
   leupsv[[i]]<-leupsv100[c(i,101,102)]%>%merge(leupredictorspsv,by=c("x","y"))%>%na.omit()
