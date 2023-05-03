@@ -213,7 +213,7 @@ ggplot(data=plotdataleurpd,aes(Degree_of_generalism,RPD))+
 leupsv100<-read.csv("leupsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 leupredictorspsv=leupredictors[,!names(leupredictors) %in%c(
-  "HUman_footprint","Humanpopdens","Host_richness"."PET")]
+  "HUman_footprint","Humanpopdens","Host_richness","PET")]
 leupsv<-list()
 for (i in 1:100){
   leupsv[[i]]<-leupsv100[c(i,101,102)]%>%merge(leupredictorspsv,by=c("x","y"))%>%na.omit()
