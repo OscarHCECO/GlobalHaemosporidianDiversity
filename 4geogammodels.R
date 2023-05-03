@@ -26,7 +26,7 @@ summary(plasSR)
 AIC(plasSR$gam.final)
 plasSR$gam.final
 #Plots
-gray7=gray(0.3)
+gray7<-gray(0.3)
 ggplot(data=plasrichness,aes(Degree_of_generalism,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
@@ -42,7 +42,7 @@ plasrpd100<-read.csv("plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmo
 plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","PET")]#Delete unimportant predictors
 plasrpd<-list()
 for (i in 1:100){
-  plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictors1,by=c("x","y"))%>%na.omit()
+  plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictorsrpd,by=c("x","y"))%>%na.omit()
 }
 doParallel::registerDoParallel(cl = my.cluster)
 plasgamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
@@ -62,6 +62,7 @@ plaspsv<-list()
 for (i in 1:100){
   plaspsv[[i]]<-plaspsv100[c(i,101,102)]%>%merge(plaspredictorspsv,by=c("x","y"))%>%na.omit()
 }
+doParallel::registerDoParallel(cl = my.cluster)
 plasgampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
   geoGAM::geoGAM(response="psv", covariates = names(plaspredictorspsv[3:ncol(plaspredictorspsv)]),
                  data=as.data.frame(plaspsv[[i]]), coords = c("x","y"),
@@ -71,7 +72,7 @@ pulldata(plasgampsv)
 #Plots
 plotdataplaspsv<-list()
 for (i in 1:100){
-  plotdataplaspsv[[i]]<-cbind(plaspsv[[i]],as.data.frame(rep(paste0("model",i),322)))
+  plotdataplaspsv[[i]]<-cbind(plaspsv[[i]],as.data.frame(rep(paste0("model",i))))
 }
 plotdataplaspsv<-do.call(rbind,plotdataplaspsv)
 colnames(plotdataplaspsv)[ncol(plotdataplaspsv)]<-"model"
@@ -91,7 +92,7 @@ haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
   na.omit()
 haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
                       data=haerichness, coords = c("x","y"),
-                      max.stop = 1000, verbose = 2,non.stationary = T, seed=seed[32])
+                      max.stop = 1000, verbose = 2,non.stationary = T)
 summary(haeSR)
 AIC(plasSR$gam.final)
 #Plots
@@ -126,6 +127,7 @@ ggplot(data=plotdatahaerpd,aes(PET,RPD))+
   geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
   theme(legend.position = "none")#PET
+
 
 #################################### PSV
 haepsv100<-read.csv("haepsv100.csv",row.names = 1)%>%
