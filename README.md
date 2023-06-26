@@ -1,5 +1,5 @@
 # Global Haemosporidian Diversity
-This repository contains the scripts used in the analysis presented in the manuscript titled "Energy input, Habitat heterogeneity, and host specificity of parasites explain variation in the diversity of avian haemosporidian assemblages at continental scales."
+This repository contains the scripts used in the analysis presented in the manuscript titled "Energy Input, Habitat Heterogeneity, and Host Specificity Drive Avian Haemosporidian Diversity at Continental Scales"
 The four scripts included are:
 - `dependent variables` calulate pylogenetic diversity metrics of parasite assemblages.
 - `predictors` calculates predictors such as host richness and degree of generalism and merges it with environmental data obtained from different products.
