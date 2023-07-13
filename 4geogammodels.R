@@ -5,6 +5,7 @@ library(geoGAM)
 library(mgcv)
 library(caret)
 library(ggplot2)
+
 ncores=detectCores()-1#Prepare a cluster to run analysis in parallel, here use all your cores -1
 my.cluster <- parallel::makeCluster(
   ncores, 
@@ -123,7 +124,7 @@ for (i in 1:100){
 }
 plotdatahaerpd<-do.call(rbind,datahaerpd)
 colnames(plotdatahaerpd)[ncol(plotdatahaerpd)]<-"model"
-ggplot(data=plotdatahaerpd,aes(PET,RPD))+
+ggplot(data=plotdatahaerpd,aes(Temperature,RPD))+
   geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
   theme(legend.position = "none")#PET
@@ -154,6 +155,12 @@ ggplot(data=plotdatahaepsv,aes(Human_footprint,psv))+
   geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
   theme(legend.position = "none")#Human footprint
+
+ggplot(data=plotdatahaepsv,aes(Degree_of_generalism,psv))+
+  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
+  theme(legend.position = "none")#Human footprint
+
 
 # Leucocytozoon ####
 leupredictors<-read.csv("leupredictors.csv",row.names=1)
@@ -224,8 +231,9 @@ doParallel::registerDoParallel(cl = my.cluster)
 leugampsv<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
   geoGAM::geoGAM(response="psv", covariates = names(leupredictorspsv[c(3:ncol(leupredictorspsv))]),
                  data=leupsv[[i]], coords = c("x","y"),
-                 max.stop = 1000, verbose = 2,seed = seed[i],non.stationary = T)
+                 max.stop = 1000, verbose = 2,non.stationary = T)
 }
+
 pulldata(leugampsv)
 
 #Plots
