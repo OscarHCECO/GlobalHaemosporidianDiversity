@@ -50,6 +50,7 @@ write.csv(plasrpd100df,"plasrpd100.csv")#Save Plasmodium RPD
 # Haemoproteus ####
 haepresab<-read.csv("haemoproteusPAM",row.names = 1)
 doParallel::registerDoParallel(cl = my.cluster)
+haetrr<-read.tree("haemcctrees")#load trees
 haenewdata<-foreach::foreach(i = 1:100)%dopar%{
   picante::match.phylo.comm(haetrr[[i]],haepresab)                          
 }
