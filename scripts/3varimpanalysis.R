@@ -8,7 +8,6 @@ library(dplyr)
 library(parallel)
 library(geoGAM)
 library(mgcv)
-library(caret)
 library(doParallel)
 # Varimp analysis
 control <- trainControl(method = 'repeatedcv',# Train control model to identify best predictors with 10 folds and 1000 iterations
