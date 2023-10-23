@@ -59,25 +59,8 @@ leuid<-regiongrid%>%over(genusleu.SPDFmal,returnList = F)%>%cbind(as.data.frame(
 leuid<-leuid%>%dplyr::select(c(ncol(leuid),(ncol(leuid)-1)))%>%purrr::set_names("y","x")%>%mutate(".id"=row.names(leuid))
 leucommunitigeneralism=genusleu.regionras%>%group_by(.id)%>%summarize(mean(PD))%>%as.data.frame()%>%merge(leuid,by=".id")
 colnames(leucommunitigeneralism)[2]="Degree_of_generalism"
-#### Host richness  ####
-library(raster)
-library(rgdal)
-library("letsR")
-birds_shp <- readOGR(dsn = "your/own/path" , layer = "layername")#Birdlife.org shapes with bird species distributions
-locals<-rbind(plaspresab[,c(4,5)],haepresab[,c(4,5)],leupresab[,c(4,5)])#locals of interest
-names(locals)<-c("Long","Lat")
-localsid<-rbind(plaspresab[,c(2,3)],haepresab[,c(2,3)],leupresab[,c(2,3)])
-coordinates(locals) <- ~Long+Lat
-proj4string(locals) <-CRS("+proj=longlat +datum=WGS84 +no_defs")
-total.SPDF<-SpatialPointsDataFrame(coords=locals,data=localsid)# All studied locals (Assemblages of the three genera in the three studied regions)
-ext=extent(total.SPDF)
-ppoligon <- regiongrid[regiongrid$layer%in%c(unique(localsid$poligons)),]#Select de studied cells from the complete grid
-letspresab<-lets.presab.grid(birds_shp,ppoligon,"layer",remove.sp=T)#Obtain the Presence - absence matrix with all bird species with distribution within studied cells
-Hostrichness<-cbind(as.data.frame(as.numeric(rownames(letspresab$PAM))),#This calculates sums of all presences within cells, this is our metric of host richness
-                   coordinates(letspresab$grid),as.data.frame(rowSums(letspresab$PAM)))
-names(Hostrichness)=c("id.","x","y","Host_richness")
 
-# Load environmental predictors ####
+# Load environmental predictors + hostrichness####
 
 environmental<-read.csv("data/envpredictors.csv",row.names = "X")
 #This dataset contains coordinates of a 0.25 grid with info of different open source datasets
@@ -92,14 +75,14 @@ environmental<-read.csv("data/envpredictors.csv",row.names = "X")
 #-EVI (2000-2020 mean Enhanced vegetation index from MODIS-MOD12A3)
 #### predictors by genus 
 
-plas<-plaspresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
-plas<-cbind(plas[,c("x","y")],scale(plas[c(3:13)]))#Standardize predictors
+plas<-plaspresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
+plas<-cbind(plas[,c("x","y")],scale(plas[c(3:14)]))#Standardize predictors
 write.csv(plas,"out/plaspredictors.csv")
-hae<-haepresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
-hae<-cbind(hae[,c("x","y")],scale(hae[c(3:13)]))
+hae<-haepresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
+hae<-cbind(hae[,c("x","y")],scale(hae[c(3:14)]))
 write.csv(hae,"out/haepredictors.csv")
-leu<-leupresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(Hostrichness, by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
-leu<-cbind(leu[,c("x","y")],scale(leu[c(3:13)]))
+leu<-leupresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
+leu<-cbind(leu[,c("x","y")],scale(leu[c(3:14)]))
 write.csv(leu,"out/leupredictors.csv")
 
 #Now we have all dependent variables and all predictors for the data analysis

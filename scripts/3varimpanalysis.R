@@ -221,12 +221,13 @@ leusrvarimpscore<-leusrvarimpscore[order(leusrvarimpscore$names,decreasing=T),]
 dataimpsr<-rbind(plassrvarimpscore,haesrvarimpscore,leusrvarimpscore)
 genus<-c(rep("Plasmodium",length(rownames(plassrvarimpscore))),rep("Haemoproteus",length(rownames(plassrvarimpscore))),
         rep("Leucocytozoon",length(rownames(plassrvarimpscore))))
-catsr<-rev(c("climatic","climatic","land","land","human","host","host","human","climatic","climatic","climatic","x","x"))
-catsr<-rep(catsr,3)
-srdf1<-cbind(dataimpsr,genus,catsr)
-srdf1<-srdf1[order(srdf1$catsr, decreasing = TRUE), ]
+cat=(c("x","x","ba","a","bb","a","a","ba","bc","bc","bb","c","bd","a"))
+cat=rep(cat,3)
+srdf1<-cbind(dataimpsr,genus,cat)
+srdf11=srdf1[order(srdf1$cat, decreasing = TRUE), ]
 
-ggplot(data=srdf1,aes(overall,names,fill=factor(genus)))+
+
+ggplot(data=srdf11,aes(overall,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
   ggtitle("(a) SR")+geom_vline(xintercept=10)

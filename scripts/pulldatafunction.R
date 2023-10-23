@@ -1,5 +1,6 @@
 pulldata<-function(geogam){
-  gamclass<-lapply(geogam,class)%>%plyr::ldply(rbind)%>%dplyr::select(1)%>%purrr::set_names("class")
+  classlist <- lapply(geogam,class)
+  gamclass<-as.data.frame(do.call(rbind,classlist))%>%dplyr::select(1)%>%purrr::set_names("class")
   notfitted<-(which(gamclass$class!="geoGAM",T))
   if (length(notfitted)>=1){
     geogam<-geogam[-c(notfitted)]
@@ -29,7 +30,7 @@ pulldata<-function(geogam){
     predtable[[i]]<-summ[[i]]$p.table
     formula[[i]]<-summ[[i]]$formula
   }
-  estimates<-predtable%>%plyr::ldply(rbind)
+  estimates<-do.call(rbind,predtable)
   aic<-aic%>%plyr::ldply(as.numeric)%>%as.data.frame()
   rsq<-rsq%>%plyr::ldply(as.numeric)%>%as.data.frame()
   devexplain<-devexplain%>%plyr::ldply(as.numeric)%>%as.data.frame()
@@ -38,7 +39,7 @@ pulldata<-function(geogam){
                          "Std_Error", "t_value","p_val")
   estimatesmean<-apply(data1,2,mean)#overall model (1:3) and intercept data(4:7)
   estimatessd<-apply(data1,2,sd)#
-  data2<-smoothtable1%>%plyr::ldply(rbind)%>%as.data.frame()
+  data2<-smoothtable1%>%bind_rows()%>%as.data.frame()
   colnames(data2)[c(4,5)]<-c("pval","variable")
   predfres<-table(data2$variable)#How many times a predictor was fitted in the final (best) model
   preds<-length(unique(data2$variable))

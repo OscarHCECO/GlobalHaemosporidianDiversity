@@ -14,8 +14,8 @@ my.cluster <- parallel::makeCluster(
 #Plasmodium ####
 plaspredictors<-read.csv("out/plaspredictors.csv",row.names=1)#load data set with predictors for assemblages of each genus 
 #################################### SR 
-plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("Human_footprint",#Delete less important predictors (<10 in varimp analysis)
-                                                               "Humanpopdens","Ec.Het","PET","Rain_seasonality")]
+plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("shannon_diversity","Human_footprint",#Delete less important predictors (<10 in varimp analysis)
+                                                               "Humanpopdens","Ec.Het","Prec.seas.")]
 plaspresab<-read.csv("data/plasmodiumPAM",row.names = 1)#Load parasite presence absence matrices
 plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
   purrr::set_names("SR")%>%cbind(plaspresab[c("x","y")])%>%merge(plaspredictorssr,by=(c("x","y")))%>%
@@ -23,7 +23,8 @@ plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
 plasSR<-geoGAM::geoGAM(response="SR", covariates = (names(plasrichness[,c(4:ncol(plasrichness))])),
                        data=plasrichness, coords = c("x","y"),#Perform a geogam model building procedure 
                        max.stop = 1000, verbose = 2,non.stationary = T)
-summary(plasSR)
+sumplassr <- summary(plasSR)
+mgcv::concurvity(gam(sumplassr$summary.gam$formula,data=plasrichness),full=F)
 AIC(plasSR$gam.final)
 plasSR$gam.final
 #Plots
@@ -40,7 +41,7 @@ ggplot(data=plasrichness,aes(Host_richness,SR))+
 #################################### RPD
 plasrpd100<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 100 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
-plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","PET")]#Delete unimportant predictors
+plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Ec.Het","shannon_diversity")]#Delete unimportant predictors
 plasrpd<-list()
 for (i in 1:100){
   plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictorsrpd,by=c("x","y"))%>%na.omit()
@@ -56,9 +57,11 @@ pulldata(plasgamrpd)#Summarizes data from the 100 models (you have to load this 
 #################################### PSV
 plaspsv100<-read.csv("out/plaspsv100.csv",row.names = 1)%>%# Load measures of Plasmodium psv based on 100 phylogenetic trees
   purrr::set_names(c(rep("psv",100),"x","y"))
-plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Humanpopdens","Human_footprint",#Delete unimportant predictors of PSV
-                                                              "Host_richness","Ec.Het","PET",
-                                                              "Rain_seasonality")]
+plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Trange","rad",
+                                                                "Temperature",
+                                                                "Humanpopdens","Human_footprint",#Delete unimportant predictors of PSV
+                                                              "Host_richness","Ec.Het","aet",
+                                                              "Prec.seas.","shannon_diversity")]
 plaspsv<-list()
 for (i in 1:100){
   plaspsv[[i]]<-plaspsv100[c(i,101,102)]%>%merge(plaspredictorspsv,by=c("x","y"))%>%na.omit()
@@ -94,8 +97,9 @@ haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
 haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
                       data=haerichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T)
-summary(haeSR)
+sum<- summary(haeSR)
 AIC(haeSR$gam.final)
+mgcv::concurvity(gam(sum$summary.gam$formula,data=haerichness),full=F)
 #Plots
 ggplot(data=haerichness,aes(Host_richness,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
@@ -165,15 +169,17 @@ ggplot(data=plotdatahaepsv,aes(Degree_of_generalism,psv))+
 # Leucocytozoon ####
 leupredictors<-read.csv("out/leupredictors.csv",row.names=1)
 #################################### SR
-leupresab<-read.csv("out/leucocytozoonPAM",row.names = 1)
+leupresab<-read.csv("data/leucocytozoonPAM",row.names = 1)
 leupredictorssr<-leupredictors[,!names(leupredictors) %in%c("Ec.Het")]
 leurichness<-leupresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
   purrr::set_names("SR")%>%cbind(leupresab[c("x","y")])%>%merge(leupredictorssr,by=(c("x","y")))%>%
   na.omit()
 leuSR<-geoGAM::geoGAM(response="SR", covariates = (names(leurichness[,c(4:ncol(leurichness))])),
                       data=leurichness, coords = c("x","y"),
-                      max.stop = 1000, verbose = 2,non.stationary = T,seed=seed[3])
-summary(leuSR)
+                      max.stop = 1000, verbose = 2,non.stationary = T)
+
+sumleusr <- summary(leuSR)
+mgcv::concurvity(gam(sumleusr$summary.gam$formula,data=leurichness),full=F)
 AIC(leuSR$gam.final)
 
 #Plots
@@ -247,3 +253,4 @@ ggplot(data=plotdataleupsv,aes(Degree_of_generalism,psv))+
   geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
   theme(legend.position = "none")#Degree of generalism
+
