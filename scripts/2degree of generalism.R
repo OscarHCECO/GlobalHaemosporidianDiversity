@@ -74,14 +74,14 @@ environmental<-read.csv("data/envpredictors.csv",row.names = "X")
 #-Ec.Het (Ecosystem heterogeneity calculated with Rao´s Q, diversity metric of evi measures within a cell using RASTERDIV package workflow)
 #-EVI (2000-2020 mean Enhanced vegetation index from MODIS-MOD12A3)
 #### predictors by genus 
-
-plas<-plaspresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
+names(leupresab)
+plas<-plaspresab[,c("x","y")]%>%merge(environmental,by=c("x","y"))%>%merge(plascommunitigeneralism[-1],by=c("x","y"))
 plas<-cbind(plas[,c("x","y")],scale(plas[c(3:14)]))#Standardize predictors
 write.csv(plas,"out/plaspredictors.csv")
-hae<-haepresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
+hae<-haepresab[,c("x","y")]%>%merge(environmental,by=c("x","y"))%>%merge(haecommunitigeneralism[-1],by=c("x","y"))
 hae<-cbind(hae[,c("x","y")],scale(hae[c(3:14)]))
 write.csv(hae,"out/haepredictors.csv")
-leu<-leupresab[,c(4,5)]%>%merge(environmental,by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
+leu<-leupresab[,c("x","y")]%>%merge(environmental,by=c("x","y"))%>%merge(leucommunitigeneralism[-1],by=c("x","y"))
 leu<-cbind(leu[,c("x","y")],scale(leu[c(3:14)]))
 write.csv(leu,"out/leupredictors.csv")
 

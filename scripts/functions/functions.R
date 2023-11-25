@@ -27,8 +27,8 @@ divcalc <- function(presab,tree,refs){
     pddef[[i]]<-pd[[i]]%>%dplyr::select("PD")
   }
   pd100<-do.call(cbind, pddef)
-  richness<-presab[-c(refs)]%>%rowSums()%>%as.data.frame() %>% cbind(presab[c(refs)])#SR Plasmodium
-  names(richness)<-c("SR")
+  richness<-presab[-c(refs)]%>%rowSums()%>%as.data.frame() %>% cbind(presab[c("x","y")])#SR Plasmodium
+  names(richness)<-c("SR","x","y")
   data<-list()
   rpd<-list()
   for (i in 1:length(tree)){
@@ -41,9 +41,6 @@ divcalc <- function(presab,tree,refs){
   return(list(richness,rpd100df,psv100df))
 }
 
-
-predictors <- haepredictors
-multidependent <- haerpd 
 
 
 reapeatedimp <- function(predictors,multidependent,n){

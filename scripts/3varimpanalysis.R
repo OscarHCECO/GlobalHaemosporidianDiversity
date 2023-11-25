@@ -1,215 +1,118 @@
 library(dplyr)
 library(parallel)
-library(geoGAM)
 library(mgcv)
 library(caret)
-library(doParallel)
-library(dplyr)
-library(parallel)
-library(geoGAM)
-library(mgcv)
 library(doParallel)
 # Varimp analysis
 control <- trainControl(method = 'repeatedcv',# Train control model to identify best predictors with 10 folds and 1000 iterations
                         number = 10,
                         repeats = 1000,
                         search = 'grid')
-ncores=detectCores()-1
-my.cluster <- parallel::makeCluster(
-  ncores, 
-  type = "PSOCK"
-)
-#Haemoproteus ####
-haepredictors<-read.csv("out/haepredictors.csv",row.names=1)#load dataset with predictors  
-#Haemoproteus RPD
-haerpd<-read.csv("out/haerpd100.csv",row.names = 1)%>%# Load measures of RPD for Haemoproteus  (based on 100 phylogenetic trees)
-  purrr::set_names(c(rep("RPD",100),"x","y"))
-haerpdxy<-list()
-haerpddf<-list()
-for (i in 1:100){
-  haerpdxy[[i]]<-haerpd[c(i,101,102)]
-  haerpddf[[i]]<-haerpdxy[[i]]%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-haerpdvarimp<-foreach::foreach(i = 1:100)%dopar%{
-  caret::train(RPD~.,modelType="gam",metric="Rsquared",data=haerpddf[[i]],
-               control=control,family = "gaussian")     #Train GAM model with the data of Haemoproteus assemblages, performance measured in terms on Rsquared                     
-}
-haerpdvarimpsc<-list()
-haerpdvarimpscore<-list()
-for(i in 1:100){haerpdvarimpsc[[i]]<-caret::varImp(haerpdvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  haerpdvarimpscore[[i]] <- data.frame(overall = haerpdvarimpsc[[i]]$importance$Overall,
-                                       names   = rownames(haerpdvarimpsc[[i]]$importance))
-  haerpdvarimpscore[[i]]<-haerpdvarimpscore[[i]][order(haerpdvarimpscore[[i]]$names,decreasing=T),]
-}
-haerpdvarimpscoredf<-haerpdvarimpscore%>%plyr::ldply(rbind)
-#Haemoproteus PSV
-haepsv<-read.csv("out/haepsv100.csv",row.names = 1)%>%
-  purrr::set_names(c(rep("psv",100),"x","y"))
-haepsvxy<-list()
-haepsvdf<-list()
-for (i in 1:100){
-  haepsvxy[[i]]<-haepsv[c(i,101,102)]
-  haepsvdf[[i]]<-haepsvxy[[i]]%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-haepsvvarimp<-foreach::foreach(i = 1:100)%dopar%{
-  caret::train(psv~.,modelType="gam",metric="Rsquared",data=haepsvdf[[i]],
-               control=control,family = "gaussian")                          
-}
-haepsvvarimpsc<-list()
-haepsvvarimpscore<-list()
-for(i in 1:100){
-  haepsvvarimpsc[[i]]<-caret::varImp(haepsvvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  haepsvvarimpscore[[i]] <- data.frame(overall = haepsvvarimpsc[[i]]$importance$Overall,
-                                       names   = rownames(haepsvvarimpsc[[i]]$importance))
-  haepsvvarimpscore[[i]]<-haepsvvarimpscore[[i]][order(haepsvvarimpscore[[i]]$names,decreasing=T),]
-}
-haepsvvarimpscoredf<-haepsvvarimpscore%>%plyr::ldply(rbind)
-# Hemoproteus richness
-haepresab<-read.csv("data/haemoproteusPAM",row.names = 1)
-haerichness=sqrt(as.data.frame(rowSums(haepresab[5:ncol(haepresab)])))%>%purrr::set_names("SR")%>%
-  cbind(haepresab[c("x","y")])%>%merge(haepredictors,by=c("x","y"))%>%na.omit()
-haesrvarimp=caret::train(SR~.,modelType="gam",metric="Rsquared",data=haerichness,
-                         tuneLength  = 2,control=control,family = "gaussian")                          
-haesrvarimpsc=caret::varImp(haesrvarimp,scale=T)
-haesrvarimpscore<- data.frame(overall = haesrvarimpsc$importance$Overall,
-                              names   = rownames(haesrvarimpsc$importance))
-haesrvarimpscore<-haesrvarimpscore[order(haesrvarimpscore$names,decreasing=T),]
-##############################################################################################################
-# Plasmodium ####
-plaspredictors<-read.csv("out/plaspredictors.csv",row.names=1)
-# Plasmodium RPD
-plasrpd<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 1000 phylogenetic trees
-  purrr::set_names(c(rep("RPD",100),"x","y"))
-plasrpdxy<-list()
-plasrpddf<-list()
-for (i in 1:100){
-  plasrpdxy[[i]]<-plasrpd[c(i,101,102)]
-  plasrpddf[[i]]<-plasrpdxy[[i]]%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-plasrpdvarimp=foreach::foreach(i = 1:100)%dopar%{
-  caret::train(RPD~.,modelType="gam",metric="Rsquared",data=plasrpddf[[i]],
-               control=control,family = "gaussian")                          
-}
-plasrpdvarimpsc<-list()
-plasrpdvarimpscore<-list()
-for(i in 1:100){
-  plasrpdvarimpsc[[i]]<-caret::varImp(plasrpdvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  plasrpdvarimpscore[[i]] <- data.frame(overall = plasrpdvarimpsc[[i]]$importance$Overall,
-                                        names   = rownames(plasrpdvarimpsc[[i]]$importance))
-  plasrpdvarimpscore[[i]]<-plasrpdvarimpscore[[i]][order(plasrpdvarimpscore[[i]]$names,decreasing=T),]
-}
-plasrpdvarimpscoredf<-plasrpdvarimpscore%>%plyr::ldply(rbind)
-# Plasmodium PSV
-plaspsv<-read.csv("out/plaspsv100.csv",row.names = 1)%>%
-  purrr::set_names(c(rep("psv",100),"x","y"))
-plaspsvxy<-list()
-plaspsvdf<-list()
-for (i in 1:100){
-  plaspsvxy[[i]]<-plaspsv[c(i,101,102)]
-  plaspsvdf[[i]]<-plaspsvxy[[i]]%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-plaspsvvarimp<-foreach::foreach(i = 1:100)%dopar%{
-  caret::train(psv~.,modelType="gam",metric="Rsquared",data=plaspsvdf[[i]],
-               control=control,family = "gaussian")                          
-}
-plaspsvvarimpsc<-list()
-plaspsvvarimpscore<-list()
-for(i in 1:100){
-  plaspsvvarimpsc[[i]]<-caret::varImp(plaspsvvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  plaspsvvarimpscore[[i]] <- data.frame(overall = plaspsvvarimpsc[[i]]$importance$Overall,
-                                        names   = rownames(plaspsvvarimpsc[[i]]$importance))
-  plaspsvvarimpscore[[i]]<-plaspsvvarimpscore[[i]][order(plaspsvvarimpscore[[i]]$names,decreasing=T),]
-}
-plaspsvvarimpscoredf<-plaspsvvarimpscore%>%plyr::ldply(rbind)
 
-# Plasmodium richness
+##### Plamodium 
+plaspredictors<-read.csv("out/plaspredictors.csv",row.names=1)#load dataset with predictors  
 plaspresab<-read.csv("data/plasmodiumPAM",row.names = 1)
-plasrichness=sqrt(as.data.frame(rowSums(plaspresab[5:ncol(plaspresab)])))%>%purrr::set_names("SR")%>%
+#SR
+plasrichness <- read.csv("./out/plassr.csv") %>% select(c("SR","x","y")) %>% merge(plaspredictors,by=(c("x","y"))) %>% na.omit() %>% 
+  as.data.frame()
+plasrichness <- sqrt(as.data.frame(rowSums(plaspresab[5:ncol(plaspresab)])))%>%purrr::set_names("SR")%>%
   cbind(plaspresab[c("x","y")])%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
-plassrvarimp=caret::train(SR~.,modelType="gam",metric="Rsquared",data=plasrichness,
+plassrvarimp <- caret::train(SR~.,modelType="gam",metric="Rsquared",data=plasrichness,
                          tuneLength  = 2,control=control,family = "gaussian")                          
-plassrvarimpsc=caret::varImp(plassrvarimp,scale=T)
+plassrvarimpsc <- caret::varImp(plassrvarimp,scale=T)
 plassrvarimpscore<- data.frame(overall = plassrvarimpsc$importance$Overall,
                               names   = rownames(plassrvarimpsc$importance))
 plassrvarimpscore<-plassrvarimpscore[order(plassrvarimpscore$names,decreasing=T),]
 
-
-##############################################################################################################
-# Leucocytozoon ####
-leupredictors=read.csv("out/leupredictors.csv", row.names=1)
-# Leucocytozoon RPD
-leurpd=read.csv("out/leurpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 1000 phylogenetic trees
+#rpd
+plasrpd<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of RPD for plasmoproteus  (based on 100 phylogenetic trees)
   purrr::set_names(c(rep("RPD",100),"x","y"))
-leurpdxy<-list()
-leurpddf<-list()
-for (i in 1:100){
-  leurpdxy[[i]]<-leurpd[c(i,101,102)]
-  leurpddf[[i]]<-leurpdxy[[i]]%>%merge(leupredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-leurpdvarimp=foreach::foreach(i = 1:100)%dopar%{
-  caret::train(RPD~.,modelType="gam",metric="Rsquared",data=leurpddf[[i]],
-               control=control,family = "gaussian")                          
-}
-leurpdvarimpsc<-list()
-leurpdvarimpscore<-list()
-for(i in 1:100){
-  leurpdvarimpsc[[i]]<-caret::varImp(leurpdvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  leurpdvarimpscore[[i]] <- data.frame(overall = leurpdvarimpsc[[i]]$importance$Overall,
-                                       names   = rownames(leurpdvarimpsc[[i]]$importance))
-  leurpdvarimpscore[[i]]<-leurpdvarimpscore[[i]][order(leurpdvarimpscore[[i]]$names,decreasing=T),]
-}
-leurpdvarimpscoredf<-leurpdvarimpscore%>%plyr::ldply(rbind)
-#Leucocytozoon psv
-leupsv<-read.csv("out/leupsv100.csv",row.names = 1)%>%
+impplasrpd <-reapeatedimp(plaspredictors,plasrpd) 
+#prepare data for plotting
+impplasrpdmean<-aggregate(impplasrpd$overall, list(impplasrpd$names), FUN=mean)
+impplasrpdsd<-aggregate(impplasrpd$overall, list(impplasrpd$names), FUN=sd)
+plasimprpddf<-merge(impplasrpdmean,impplasrpdsd,by="Group.1")
+names(plasimprpddf)<-c("names","mean","sd")
+plasimprpddf<-plasimprpddf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimprpddf)))))
+
+#psv
+plaspsv<-read.csv("out/plaspsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
-leupsvxy<-list()
-leupsvdf<-list()
-for (i in 1:100){
-  leupsvxy[[i]]<-leupsv[c(i,101,102)]
-  leupsvdf[[i]]<-leupsvxy[[i]]%>%merge(leupredictors,by=c("x","y"))%>%na.omit()
-}
-doParallel::registerDoParallel(cl = my.cluster)
-leupsvvarimp=foreach::foreach(i = 1:100)%dopar%{
-  caret::train(psv~.,modelType="gam",metric="Rsquared",data=leupsvdf[[i]],
-               control=control,family = "gaussian")                          
-}
-leupsvvarimpsc<-list()
-leupsvvarimpscore<-list()
-for(i in 1:100){
-  leupsvvarimpsc[[i]]<-caret::varImp(leupsvvarimp[[i]],scale=T)
-}
-for(i in 1:100){
-  leupsvvarimpscore[[i]] <- data.frame(overall = leupsvvarimpsc[[i]]$importance$Overall,
-                                       names   = rownames(leupsvvarimpsc[[i]]$importance))
-  leupsvvarimpscore[[i]]<-leupsvvarimpscore[[i]][order(leupsvvarimpscore[[i]]$names,decreasing=T),]
-}
-leupsvvarimpscoredf<-leupsvvarimpscore%>%plyr::ldply(rbind)
-# Leucocytozoon richness
+impplaspsv <-reapeatedimp(plaspredictors,plaspsv) 
+#prepare data for plotting
+impplaspsvmean<-aggregate(impplaspsv$overall, list(impplaspsv$names), FUN=mean)
+impplaspsvsd<-aggregate(impplaspsv$overall, list(impplaspsv$names), FUN=sd)
+plasimppsvdf<-merge(impplaspsvmean,impplaspsvsd,by="Group.1")
+names(plasimppsvdf)<-c("names","mean","sd")
+plasimppsvdf<-plasimppsvdf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimppsvdf)))))
+
+# Hemoproteus 
+haepresab<-read.csv("data/haemoproteusPAM",row.names = 1)
+haepredictors<-read.csv("out/haepredictors.csv",row.names=1)#load dataset with predictors  
+
+#SR
+haerichness <- read.csv("./out/haesr.csv") %>% select(c("SR","x","y")) %>% merge(haepredictors,by=(c("x","y"))) %>% na.omit() %>% 
+  as.data.frame()
+
+haesrvarimp <- caret::train(sqrt(SR)~.,modelType="gam",metric="Rsquared",data=haerichness,
+                         tuneLength  = 2,control=control,family = "gaussian")                          
+haesrvarimpsc <- caret::varImp(haesrvarimp,scale=T)
+haesrvarimpscore<- data.frame(overall = haesrvarimpsc$importance$Overall,
+                              names   = rownames(haesrvarimpsc$importance))
+haesrvarimpscore<-haesrvarimpscore[order(haesrvarimpscore$names,decreasing=T),]
+#RPD
+haerpd<-read.csv("out/haerpd100.csv",row.names = 1)%>%# Load measures of RPD for Haemoproteus  (based on 100 phylogenetic trees)
+  purrr::set_names(c(rep("var",100),"x","y"))
+imphaerpd <-reapeatedimp(haepredictors,haerpd) 
+#prepare data for plotting
+imphaerpdmean<-aggregate(imphaerpd$overall, list(imphaerpd$names), FUN=mean)
+imphaerpdsd<-aggregate(imphaerpd$overall, list(imphaerpd$names), FUN=sd)
+haeimprpddf<-merge(imphaerpdmean,imphaerpdsd,by="Group.1")
+names(haeimprpddf)<-c("names","mean","sd")
+haeimprpddf<-haeimprpddf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimprpddf)))))
+#PSV
+haepsv<-read.csv("out/haepsv100.csv",row.names = 1)%>%
+  purrr::set_names(c(rep("psv",100),"x","y"))
+imphaepsv <-reapeatedimp(haepredictors,haepsv) 
+#prepare data for plotting
+imphaepsvmean<-aggregate(imphaepsv$overall, list(imphaepsv$names), FUN=mean)
+imphaepsvsd<-aggregate(imphaepsv$overall, list(imphaepsv$names), FUN=sd)
+haeimppsvdf<-merge(imphaepsvmean,imphaepsvsd,by="Group.1")
+names(haeimppsvdf)<-c("names","mean","sd")
+haeimppsvdf<-haeimppsvdf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimppsvdf)))))
+# Leucocytozoon
 leupresab<-read.csv("data/leucocytozoonPAM",row.names = 1)
-leurichness=sqrt(as.data.frame(rowSums(leupresab[5:ncol(leupresab)])))%>%purrr::set_names("SR")%>%
-  cbind(leupresab[c("x","y")])%>%merge(leupredictors,by=c("x","y"))%>%na.omit()
-leusrvarimp=caret::train(SR~.,modelType="gam",metric="Rsquared",data=leurichness,
-                          tuneLength  = 2,control=control,family = "gaussian")                          
+leupredictors<-read.csv("out/leupredictors.csv",row.names=1)#load dataset with predictors  
+
+#SR
+leurichness <- read.csv("./out/leusr.csv") %>% select(c("SR","x","y")) %>% merge(leupredictors,by=(c("x","y"))) %>% na.omit() %>% 
+  as.data.frame()
+leusrvarimp=caret::train(sqrt(SR)~.,modelType="gam",metric="Rsquared",data=leurichness,
+                         tuneLength  = 2,control=control,family = "gaussian")                          
 leusrvarimpsc=caret::varImp(leusrvarimp,scale=T)
 leusrvarimpscore<- data.frame(overall = leusrvarimpsc$importance$Overall,
-                               names   = rownames(leusrvarimpsc$importance))
+                              names   = rownames(leusrvarimpsc$importance))
 leusrvarimpscore<-leusrvarimpscore[order(leusrvarimpscore$names,decreasing=T),]
-
+#RPD
+leurpd<-read.csv("out/leurpd100.csv",row.names = 1)%>%# Load measures of RPD for leumoproteus  (based on 100 phylogenetic trees)
+  purrr::set_names(c(rep("RPD",100),"x","y"))
+impleurpd <-reapeatedimp(leupredictors,leurpd) 
+#prepare data for plotting
+impleurpdmean<-aggregate(impleurpd$overall, list(impleurpd$names), FUN=mean)
+impleurpdsd<-aggregate(impleurpd$overall, list(impleurpd$names), FUN=sd)
+leuimprpddf<-merge(impleurpdmean,impleurpdsd,by="Group.1")
+names(leuimprpddf)<-c("names","mean","sd")
+leuimprpddf<-leuimprpddf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimprpddf)))))
+#PSV
+leupsv<-read.csv("out/leupsv100.csv",row.names = 1)%>%
+  purrr::set_names(c(rep("psv",100),"x","y"))
+impleupsv <-reapeatedimp(leupredictors,leupsv) 
+#prepare data for plotting
+impleupsvmean<-aggregate(impleupsv$overall, list(impleupsv$names), FUN=mean)
+impleupsvsd<-aggregate(impleupsv$overall, list(impleupsv$names), FUN=sd)
+leuimppsvdf<-merge(impleupsvmean,impleupsvsd,by="Group.1")
+names(leuimppsvdf)<-c("names","mean","sd")
+leuimppsvdf<-leuimppsvdf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimppsvdf)))))
 
 #############################################################################################################
 
@@ -233,21 +136,6 @@ ggplot(data=srdf11,aes(overall,names,fill=factor(genus)))+
   ggtitle("(a) SR")+geom_vline(xintercept=10)
   
 #RPD varimp ####
-plasimprpdmean<-aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=mean)
-plasimprpdsd<-aggregate(plasrpdvarimpscoredf$overall, list(plasrpdvarimpscoredf$names), FUN=sd)
-plasimprpddf<-merge(plasimprpdmean,plasimprpdsd,by="Group.1")
-names(plasimprpddf)<-c("names","mean","sd")
-plasimprpddf<-plasimprpddf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimprpddf)))))
-haeimprpdmean<-aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=mean)
-haeimprpdsd<-aggregate(haerpdvarimpscoredf$overall, list(haerpdvarimpscoredf$names), FUN=sd)
-haeimprpddf<-merge(haeimprpdmean,haeimprpdsd,by="Group.1")
-names(haeimprpddf)<-c("names","mean","sd")
-haeimprpddf<-haeimprpddf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimprpddf)))))
-leuimprpdmean<-aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=mean)
-leuimprpdsd<-aggregate(leurpdvarimpscoredf$overall, list(leurpdvarimpscoredf$names), FUN=sd)
-leuimprpddf<-merge(leuimprpdmean,leuimprpdsd,by="Group.1")
-names(leuimprpddf)=c("names","mean","sd")
-leuimprpddf<-leuimprpddf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimprpddf)))))
 dataimprdp<-rbind(plasimprpddf,haeimprpddf,leuimprpddf)
 bardataimprdpsdup<-as.data.frame(dataimprdp$mean+dataimprdp$sd)
 names(bardataimprdpsdup)<-"upper"
@@ -262,21 +150,6 @@ ggplot(data=dfrpdimp,aes(mean,names,fill=factor(genus)))+
   ggtitle("(b) RPD")+geom_vline(xintercept = 10)
 
 #PSV varimp ####
-plasimppsvmean<-aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=mean)
-plasimppsvsd<-aggregate(plaspsvvarimpscoredf$overall, list(plaspsvvarimpscoredf$names), FUN=sd)
-plasimppsvdf<-merge(plasimppsvmean,plasimppsvsd,by="Group.1")
-names(plasimppsvdf)<-c("names","mean","sd")
-plasimppsvdf<-plasimppsvdf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimppsvdf)))))
-haeimppsvmean<-aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=mean)
-haeimppsvsd<-aggregate(haepsvvarimpscoredf$overall, list(haepsvvarimpscoredf$names), FUN=sd)
-haeimppsvdf=merge(haeimppsvmean,haeimppsvsd,by="Group.1")
-names(haeimppsvdf)<-c("names","mean","sd")
-haeimppsvdf<-haeimppsvdf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimppsvdf)))))
-leuimppsvmean<-aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=mean)
-leuimppsvsd<-aggregate(leupsvvarimpscoredf$overall, list(leupsvvarimpscoredf$names), FUN=sd)
-leuimppsvdf<-merge(leuimppsvmean,leuimppsvsd,by="Group.1")
-names(leuimppsvdf)<-c("names","mean","sd")
-leuimppsvdf<-leuimppsvdf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leuimppsvdf)))))
 dataimppsv<-rbind(plasimppsvdf,haeimppsvdf,leuimppsvdf)
 bardataimppsvsdup<-as.data.frame(dataimppsv$mean+dataimppsv$sd)
 names(bardataimppsvsdup)<-"upper"
