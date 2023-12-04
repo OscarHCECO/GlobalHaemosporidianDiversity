@@ -5,26 +5,27 @@ library(geoGAM)
 library(mgcv)
 library(caret)
 library(ggplot2)
-source("scripts/pulldatafunction.R")
+source("scripts/functions/functions.R")
 ncores=detectCores()-1#Prepare a cluster to run analysis in parallel, here use all your cores -1
 my.cluster <- parallel::makeCluster(
   ncores, 
   type = "PSOCK"
 )
+todelsr <-read.csv("./out/todelsr.csv") 
+todelrpd <-read.csv("./out/todelrpd.csv") 
+todelpsv <-read.csv("./out/todelpsv.csv") 
 #Plasmodium ####
 plaspredictors<-read.csv("out/plaspredictors.csv",row.names=1)#load data set with predictors for assemblages of each genus 
 #################################### SR 
-plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c("shannon_diversity","Human_footprint",#Delete less important predictors (<10 in varimp analysis)
-                                                               "Humanpopdens","Ec.Het","Prec.seas.")]
-plaspresab<-read.csv("data/plasmodiumPAM",row.names = 1)#Load parasite presence absence matrices
-plasrichness<-plaspresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(plaspresab[c("x","y")])%>%merge(plaspredictorssr,by=(c("x","y")))%>%
+delplassr <- todelsr %>% filter(genus=="Plasmodium")
+plaspredictorssr<-plaspredictors[,!names(plaspredictors) %in%c(delplassr$names),]#Delete less important predictors (<quantile 0.25 in varimp analysis)
+plasrichness <- read.csv("./out/plassr.csv") %>% select(SR,x,y) %>% mutate(SR=sqrt(SR))%>%merge(plaspredictorssr,by=(c("x","y")))%>%
   na.omit()#Ichness is the squared root of the sum of lineages detected in each cell 
 plasSR<-geoGAM::geoGAM(response="SR", covariates = (names(plasrichness[,c(4:ncol(plasrichness))])),
                        data=plasrichness, coords = c("x","y"),#Perform a geogam model building procedure 
                        max.stop = 1000, verbose = 2,non.stationary = T)
 sumplassr <- summary(plasSR)
-mgcv::concurvity(gam(sumplassr$summary.gam$formula,data=plasrichness),full=F)
+mgcv::concurvity(gam(sumplassr$summary.gam$formula,data=plasrichness),full=F)#concurvity between pairs of predictors
 AIC(plasSR$gam.final)
 plasSR$gam.final
 #Plots
@@ -33,15 +34,29 @@ ggplot(data=plasrichness,aes(Degree_of_generalism,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
   theme(legend.position = "none")
-ggplot(data=plasrichness,aes(Host_richness,SR))+
+ggplot(data=plasrichness,aes(rad,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")
+ggplot(data=plasrichness,aes(aet,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")
+ggplot(data=plasrichness,aes(Temperature,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")
+ggplot(data=plasrichness,aes(precipitation,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
   theme(legend.position = "none")
 
 #################################### RPD
+delplasrpd <- todelrpd %>% filter(genus=="Plasmodium")
+delplasrpd <-delplasrpd$names[-6] #exclude geographic terms from this vector
 plasrpd100<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 100 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
-plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c("Ec.Het","shannon_diversity")]#Delete unimportant predictors
+plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c(delplasrpd)]#Delete unimportant predictors
 plasrpd<-list()
 for (i in 1:100){
   plasrpd[[i]]<-plasrpd100[c(i,101,102)]%>%merge(plaspredictorsrpd,by=c("x","y"))%>%na.omit()
@@ -55,13 +70,12 @@ plasgamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
 pulldata(plasgamrpd)#Summarizes data from the 100 models (you have to load this function to your workspace from "pulldatafunction" script)
 
 #################################### PSV
+delplaspsv <- todelpsv %>% filter(genus=="Plasmodium")
+delplaspsv <-delplaspsv$names[-9]#Exclude geographic terms from this vector 
 plaspsv100<-read.csv("out/plaspsv100.csv",row.names = 1)%>%# Load measures of Plasmodium psv based on 100 phylogenetic trees
   purrr::set_names(c(rep("psv",100),"x","y"))
-plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c("Trange","rad",
-                                                                "Temperature",
-                                                                "Humanpopdens","Human_footprint",#Delete unimportant predictors of PSV
-                                                              "Host_richness","Ec.Het","aet",
-                                                              "Prec.seas.","shannon_diversity")]
+plaspredictorspsv<-plaspredictors[,!names(plaspredictors) %in%c(delplaspsv)]#Delete unimportant predictors of PSV
+                                                              
 plaspsv<-list()
 for (i in 1:100){
   plaspsv[[i]]<-plaspsv100[c(i,101,102)]%>%merge(plaspredictorspsv,by=c("x","y"))%>%na.omit()
@@ -89,11 +103,13 @@ ggplot(data=plotdataplaspsv,aes(Degree_of_generalism,psv))+
 #Haemoproteus ####
 haepredictors<-read.csv("out/haepredictors.csv",row.names=1) 
 #################################### SR
-haepredictorssr<-haepredictors[,!names(haepredictors) %in%c("Ec.Het")]
+delhaesr <- todelsr %>% filter(genus=="Haemoproteus")
+
+haepredictorssr<-haepredictors[,!names(haepredictors) %in%c(delhaesr$names)]
 haepresab<-read.csv("data/haemoproteusPAM",row.names = 1)
-haerichness<-haepresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(haepresab[c("x","y")])%>%merge(haepredictorssr,by=(c("x","y")))%>%
-  na.omit()
+haerichness <- read.csv("./out/haesr.csv") %>% select(SR,x,y) %>% mutate(SR=sqrt(SR))%>%merge(haepredictorssr,by=(c("x","y")))%>%
+  na.omit()#Ichness is the squared root of the sum of lineages detected in each cell 
+
 haeSR<-geoGAM::geoGAM(response="SR", covariates = (names(haerichness[,c(4:ncol(haerichness))])),
                       data=haerichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T)
@@ -101,15 +117,21 @@ sum<- summary(haeSR)
 AIC(haeSR$gam.final)
 mgcv::concurvity(gam(sum$summary.gam$formula,data=haerichness),full=F)
 #Plots
-ggplot(data=haerichness,aes(Host_richness,SR))+
+ggplot(data=haerichness,aes(rad,SR))+
+  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
+  theme(legend.position = "none")#Host richness
+ggplot(data=haerichness,aes(precipitation,SR))+
   geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
   theme(legend.position = "none")#Host richness
 
 #################################### RPD
+delhaerpd <- todelrpd %>% filter(genus=="Haemoproteus")
+delhaerpd <-delhaerpd$names 
 haerpd1000<-read.csv("out/haerpd100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("RPD",100),"x","y"))
-haepredictorsrpd<-haepredictors[,!names(haepredictors) %in%c("Human_footprint","Humanpopdens")]
+haepredictorsrpd<-haepredictors[,!names(haepredictors) %in%c(delhaerpd)]
 haerpd<-list()
 for (i in 1:100){
   haerpd[[i]]<-haerpd1000[c(i,101,102)]%>%merge(haepredictorsrpd,by=c("x","y"))%>%na.omit()
@@ -121,20 +143,10 @@ haegamrpd<-foreach::foreach(i = 1:100,.errorhandling = 'pass')%dopar%{
                  max.stop = 1000, verbose = 2,non.stationary = T)
 }
 pulldata(haegamrpd)
-#plots
-datahaerpd<-list()
-for (i in 1:100){
-  datahaerpd[[i]]<-cbind(haerpd[[i]],as.data.frame(rep(paste0("model",i),nrow(haerpd[[i]]))))
-}
-plotdatahaerpd<-do.call(rbind,datahaerpd)
-colnames(plotdatahaerpd)[ncol(plotdatahaerpd)]<-"model"
-ggplot(data=plotdatahaerpd,aes(Temperature,RPD))+
-  geom_smooth(method="gam",se=F,aes(color=factor(model)),formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
-  scale_color_manual(values=c(rep(gray7,100)))+theme_bw()+
-  theme(legend.position = "none")#PET
-
 
 #################################### PSV
+delhaepsv <- todelpsv %>% filter(genus=="Haemoproteus")
+delhaepsv <-delhaepsv$names 
 haepsv100<-read.csv("out/haepsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 haepsv<-list()
@@ -169,11 +181,12 @@ ggplot(data=plotdatahaepsv,aes(Degree_of_generalism,psv))+
 # Leucocytozoon ####
 leupredictors<-read.csv("out/leupredictors.csv",row.names=1)
 #################################### SR
+delleusr <- todelsr %>% filter(genus=="Leucocytozoon")
 leupresab<-read.csv("data/leucocytozoonPAM",row.names = 1)
-leupredictorssr<-leupredictors[,!names(leupredictors) %in%c("Ec.Het")]
-leurichness<-leupresab[-c(1:4)]%>%rowSums()%>%as.data.frame()%>%sqrt()%>%
-  purrr::set_names("SR")%>%cbind(leupresab[c("x","y")])%>%merge(leupredictorssr,by=(c("x","y")))%>%
-  na.omit()
+leupredictorssr<-leupredictors[,!names(leupredictors) %in%c(delleusr$names)]
+leurichness<-read.csv("./out/leusr.csv") %>% select(SR,x,y) %>% mutate(SR=sqrt(SR))%>%merge(leupredictorssr,by=(c("x","y")))%>%
+  na.omit()#Ichness is the squared root of the sum of lineages detected in each cell 
+
 leuSR<-geoGAM::geoGAM(response="SR", covariates = (names(leurichness[,c(4:ncol(leurichness))])),
                       data=leurichness, coords = c("x","y"),
                       max.stop = 1000, verbose = 2,non.stationary = T)
@@ -183,23 +196,22 @@ mgcv::concurvity(gam(sumleusr$summary.gam$formula,data=leurichness),full=F)
 AIC(leuSR$gam.final)
 
 #Plots
-ggplot(data=leurichness,aes(Host_richness,SR))+
-  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
-  scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
-  theme(legend.position = "none")#Host rchness
 ggplot(data=leurichness,aes(Temperature,SR))+
-  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  geom_smooth(method="gam",se=F,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
   theme(legend.position = "none")#Temperature
 ggplot(data=leurichness,aes(Degree_of_generalism,SR))+
-  geom_smooth(method="gam",se=T,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
+  geom_smooth(method="gam",se=F,formula =y ~ 1 + ++s(x, bs = "ps", k = 16, m = c(3, 2)))+
   scale_color_manual(values=c((gray7)))+theme_bw()+geom_point()+
   theme(legend.position = "none")#Degree of generalism
 
 #################################### RPD 
+delleurpd <- todelrpd %>% filter(genus=="Leucocytozoon")
+delleurpd <- delleurpd$names
+delleurpd <-delleurpd[-11]
 leurpd100<-read.csv("out/leurpd100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("RPD",100),"x","y"))
-leupredictorsrpd<-leupredictors[,!names(leupredictors) %in%c("EVI","Temperature","Temperature_seasonality")]
+leupredictorsrpd<-leupredictors[,!names(leupredictors) %in%c(delleurpd)]
 leurpd<-list()
 for (i in 1:100){
   leurpd[[i]]<-leurpd100[c(i,101,102)]%>%merge(leupredictorsrpd,by=c("x","y"))%>%na.omit()
@@ -225,10 +237,13 @@ ggplot(data=plotdataleurpd,aes(Degree_of_generalism,RPD))+
   theme(legend.position = "none")#Degree of generalism
 
 #################################### PSV 
+delleupsv <- todelpsv %>% filter(genus=="Leucocytozoon")
+delleupsv <- delleupsv$names
+delleupsv <-delleupsv[-8]
 leupsv100<-read.csv("out/leupsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 leupredictorspsv=leupredictors[,!names(leupredictors) %in%c(
-  "Human_footprint","Humanpopdens","Host_richness","PET")]
+  delleupsv)]
 leupsv<-list()
 for (i in 1:100){
   leupsv[[i]]<-leupsv100[c(i,101,102)]%>%merge(leupredictorspsv,by=c("x","y"))%>%na.omit()
