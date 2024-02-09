@@ -28,7 +28,7 @@ genusplas.para.host.sites <- malavidataframe%>%as.data.frame()%>%filter(parasite
 genusplas.malavicoordinates <-genusplas.para.host.sites%>% dplyr::select(c("Long","Lat"))
 coordinates(genusplas.malavicoordinates) <- ~Long+Lat                                   #setting format
 proj4string(genusplas.malavicoordinates) <-CRS("+proj=longlat +datum=WGS84 +no_defs")   # setting projection
-genusplas.SPDFmal=SpatialPointsDataFrame(coords=genusplas.malavicoordinates,data=genusplas.para.host.sites) ##spatial points dataframe with lineage records and host range data
+genusplas.SPDFmal <- SpatialPointsDataFrame(coords=genusplas.malavicoordinates,data=genusplas.para.host.sites) ##spatial points dataframe with lineage records and host range data
 genusplas.regionras <- regiongrid%>%over(genusplas.SPDFmal,returnList = T)%>%lapply("[", , c("Lineage_Name","Lat","Long"))%>%
   plyr::ldply(rbind)%>%merge(hostrange,by="Lineage_Name",all=F)%>%na.omit() #Overlay the spatial points dataframe with a grid of studied regions
 plasid<-regiongrid%>%over(genusplas.SPDFmal,returnList = F)%>%cbind(as.data.frame(coordinates(regiongrid))) # Which parasites are in each studied locality (0.25x0.25 cell) cell
