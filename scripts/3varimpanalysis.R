@@ -3,6 +3,7 @@ library(parallel)
 library(mgcv)
 library(caret)
 library(doParallel)
+source("./scripts/functions/functions.R")
 # Varimp analysis
 control <- trainControl(method = 'repeatedcv',# Train control model to identify best predictors with 10 folds and 1000 iterations
                         number = 10,
@@ -27,7 +28,7 @@ plassrvarimpscore<-plassrvarimpscore[order(plassrvarimpscore$names,decreasing=T)
 #rpd
 plasrpd<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of RPD for plasmoproteus  (based on 100 phylogenetic trees)
   purrr::set_names(c(rep("RPD",100),"x","y"))
-impplasrpd <-reapeatedimp(plaspredictors,plasrpd) 
+impplasrpd <-reapeatedimp(plaspredictors,plasrpd,100) 
 #prepare data for plotting
 impplasrpdmean<-aggregate(impplasrpd$overall, list(impplasrpd$names), FUN=mean)
 impplasrpdsd<-aggregate(impplasrpd$overall, list(impplasrpd$names), FUN=sd)
@@ -38,7 +39,7 @@ plasimprpddf<-plasimprpddf%>%mutate(genus=(rep("Plasmodium",length(rownames(plas
 #psv
 plaspsv<-read.csv("out/plaspsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
-impplaspsv <-reapeatedimp(plaspredictors,plaspsv) 
+impplaspsv <-reapeatedimp(plaspredictors,plaspsv,100) 
 #prepare data for plotting
 impplaspsvmean<-aggregate(impplaspsv$overall, list(impplaspsv$names), FUN=mean)
 impplaspsvsd<-aggregate(impplaspsv$overall, list(impplaspsv$names), FUN=sd)
@@ -63,7 +64,7 @@ haesrvarimpscore<-haesrvarimpscore[order(haesrvarimpscore$names,decreasing=T),]
 #RPD
 haerpd<-read.csv("out/haerpd100.csv",row.names = 1)%>%# Load measures of RPD for Haemoproteus  (based on 100 phylogenetic trees)
   purrr::set_names(c(rep("var",100),"x","y"))
-imphaerpd <-reapeatedimp(haepredictors,haerpd) 
+imphaerpd <-reapeatedimp(haepredictors,haerpd,100) 
 #prepare data for plotting
 imphaerpdmean<-aggregate(imphaerpd$overall, list(imphaerpd$names), FUN=mean)
 imphaerpdsd<-aggregate(imphaerpd$overall, list(imphaerpd$names), FUN=sd)
@@ -73,7 +74,7 @@ haeimprpddf<-haeimprpddf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haei
 #PSV
 haepsv<-read.csv("out/haepsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
-imphaepsv <-reapeatedimp(haepredictors,haepsv) 
+imphaepsv <-reapeatedimp(haepredictors,haepsv,100) 
 #prepare data for plotting
 imphaepsvmean<-aggregate(imphaepsv$overall, list(imphaepsv$names), FUN=mean)
 imphaepsvsd<-aggregate(imphaepsv$overall, list(imphaepsv$names), FUN=sd)
@@ -96,7 +97,7 @@ leusrvarimpscore<-leusrvarimpscore[order(leusrvarimpscore$names,decreasing=T),]
 #RPD
 leurpd<-read.csv("out/leurpd100.csv",row.names = 1)%>%# Load measures of RPD for leumoproteus  (based on 100 phylogenetic trees)
   purrr::set_names(c(rep("RPD",100),"x","y"))
-impleurpd <-reapeatedimp(leupredictors,leurpd) 
+impleurpd <-reapeatedimp(leupredictors,leurpd,100) 
 #prepare data for plotting
 impleurpdmean<-aggregate(impleurpd$overall, list(impleurpd$names), FUN=mean)
 impleurpdsd<-aggregate(impleurpd$overall, list(impleurpd$names), FUN=sd)
@@ -106,7 +107,7 @@ leuimprpddf<-leuimprpddf%>%mutate(genus=(rep("Leucocytozoon",length(rownames(leu
 #PSV
 leupsv<-read.csv("out/leupsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
-impleupsv <-reapeatedimp(leupredictors,leupsv) 
+impleupsv <-reapeatedimp(leupredictors,leupsv,100) 
 #prepare data for plotting
 impleupsvmean<-aggregate(impleupsv$overall, list(impleupsv$names), FUN=mean)
 impleupsvsd<-aggregate(impleupsv$overall, list(impleupsv$names), FUN=sd)
@@ -133,8 +134,14 @@ srdf11=srdf1[order(srdf1$cat, decreasing = TRUE), ]
 ggplot(data=srdf11,aes(overall,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(a) SR")+geom_vline(xintercept=10)
-  
+  ggtitle("(a) SR")+geom_vline(xintercept=quantile(srdf11$overall,0.25))
+
+todelspr <- srdf11[srdf11$overall<quantile(srdf11$overall,0.25),]
+todelsr <- todelspr %>% select(overall,genus,names) %>% group_by(genus) %>% arrange(desc(genus))
+
+write.csv(todelsr,"./out/todelsr.csv")
+
+
 #RPD varimp ####
 dataimprdp<-rbind(plasimprpddf,haeimprpddf,leuimprpddf)
 bardataimprdpsdup<-as.data.frame(dataimprdp$mean+dataimprdp$sd)
@@ -147,8 +154,11 @@ ggplot(data=dfrpdimp,aes(mean,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(b) RPD")+geom_vline(xintercept = 10)
+  ggtitle("(b) RPD")+geom_vline(xintercept = quantile(dfrpdimp$mean,0.25))
 
+todelsprpd <- dfrpdimp[dfrpdimp$lower<quantile(dfrpdimp$mean,0.25),]
+todelrpd <- todelsprpd %>% select(mean,genus,names) %>% group_by(genus) %>% arrange(desc(genus))
+write.csv(todelrpd,"./out/todelrpd.csv")
 #PSV varimp ####
 dataimppsv<-rbind(plasimppsvdf,haeimppsvdf,leuimppsvdf)
 bardataimppsvsdup<-as.data.frame(dataimppsv$mean+dataimppsv$sd)
@@ -161,7 +171,10 @@ ggplot(data=dfpsvimp,aes(mean,names,fill=factor(genus)))+
   geom_bar(stat="identity",position="dodge")+
   geom_errorbar(aes(xmin=lower,xmax=upper),position="dodge")+
   theme_classic()+ theme(legend.position = "bottom")+
-  ggtitle("(c) PSV")+geom_vline(xintercept=10)
+  ggtitle("(c) PSV")+geom_vline(xintercept=quantile(dfpsvimp$mean,0.25))
 
 
+todelsppsv <- dfrpdimp[dfpsvimp$lower<quantile(dfpsvimp$mean,0.25),]
+todelpsv <- todelsppsv %>% select(mean,genus,names) %>% group_by(genus) %>% arrange(desc(genus))
+write.csv(todelpsv,"./out/todelpsv.csv")
 
