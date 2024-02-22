@@ -12,13 +12,10 @@ control <- trainControl(method = 'repeatedcv',# Train control model to identify 
 
 ##### Plamodium 
 plaspredictors<-read.csv("out/plaspredictors.csv",row.names=1)#load dataset with predictors  
-plaspresab<-read.csv("data/plasmodiumPAM",row.names = 1)
 #SR
 plasrichness <- read.csv("./out/plassr.csv") %>% select(c("SR","x","y")) %>% merge(plaspredictors,by=(c("x","y"))) %>% na.omit() %>% 
   as.data.frame()
-plasrichness <- sqrt(as.data.frame(rowSums(plaspresab[5:ncol(plaspresab)])))%>%purrr::set_names("SR")%>%
-  cbind(plaspresab[c("x","y")])%>%merge(plaspredictors,by=c("x","y"))%>%na.omit()
-plassrvarimp <- caret::train(SR~.,modelType="gam",metric="Rsquared",data=plasrichness,
+plassrvarimp <- caret::train(sqrt(SR)~.,modelType="gam",metric="Rsquared",data=plasrichness,
                          tuneLength  = 2,control=control,family = "gaussian")                          
 plassrvarimpsc <- caret::varImp(plassrvarimp,scale=T)
 plassrvarimpscore<- data.frame(overall = plassrvarimpsc$importance$Overall,
@@ -48,7 +45,6 @@ names(plasimppsvdf)<-c("names","mean","sd")
 plasimppsvdf<-plasimppsvdf%>%mutate(genus=(rep("Plasmodium",length(rownames(plasimppsvdf)))))
 
 # Hemoproteus 
-haepresab<-read.csv("data/haemoproteusPAM",row.names = 1)
 haepredictors<-read.csv("out/haepredictors.csv",row.names=1)#load dataset with predictors  
 
 #SR
@@ -82,11 +78,10 @@ haeimppsvdf<-merge(imphaepsvmean,imphaepsvsd,by="Group.1")
 names(haeimppsvdf)<-c("names","mean","sd")
 haeimppsvdf<-haeimppsvdf%>%mutate(genus=(rep("Haemoproteus",length(rownames(haeimppsvdf)))))
 # Leucocytozoon
-leupresab<-read.csv("data/leucocytozoonPAM",row.names = 1)
 leupredictors<-read.csv("out/leupredictors.csv",row.names=1)#load dataset with predictors  
 
 #SR
-leurichness <- read.csv("./out/leusr.csv") %>% select(c("SR","x","y")) %>% merge(leupredictors,by=(c("x","y"))) %>% na.omit() %>% 
+leurichness <- read.csv("./out/leusr.csv") %>% dplyr::select(c("SR","x","y")) %>% merge(leupredictors,by=(c("x","y"))) %>% na.omit() %>% 
   as.data.frame()
 leusrvarimp=caret::train(sqrt(SR)~.,modelType="gam",metric="Rsquared",data=leurichness,
                          tuneLength  = 2,control=control,family = "gaussian")                          

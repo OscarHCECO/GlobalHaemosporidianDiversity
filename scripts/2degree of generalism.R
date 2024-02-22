@@ -3,9 +3,10 @@ library(ape)
 library(picante)
 library(dplyr)
 library(reshape2)
-library(malaviR)
 library(rgdal)
 library(raster)
+source("./scripts/functions/functions.R")
+
 birdtree<-read.tree("data/MXCLADECREDBIRDTREE.tre")#maximum credibility tree of birds from 100 jetz phylogenetic trees
 plaspresab<-read.csv("data/plasmodiumPAM")#Load -parasite lineages x locality- matrices
 haepresab<-read.csv("data/haemoproteusPAM")

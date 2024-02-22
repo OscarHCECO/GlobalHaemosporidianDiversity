@@ -53,7 +53,7 @@ ggplot(data=plasrichness,aes(precipitation,SR))+
 
 #################################### RPD
 delplasrpd <- todelrpd %>% filter(genus=="Plasmodium")
-delplasrpd <-delplasrpd$names[-6] #exclude geographic terms from this vector
+delplasrpd <-delplasrpd$names[-4] #exclude geographic terms from this vector
 plasrpd100<-read.csv("out/plasrpd100.csv",row.names = 1)%>%# Load measures of Plasmodium RPD based on 100 phylogenetic trees
   purrr::set_names(c(rep("RPD",100),"x","y"))
 plaspredictorsrpd<-plaspredictors[,!names(plaspredictors) %in%c(delplasrpd)]#Delete unimportant predictors
@@ -182,7 +182,6 @@ ggplot(data=plotdatahaepsv,aes(Degree_of_generalism,psv))+
 leupredictors<-read.csv("out/leupredictors.csv",row.names=1)
 #################################### SR
 delleusr <- todelsr %>% filter(genus=="Leucocytozoon")
-leupresab<-read.csv("data/leucocytozoonPAM",row.names = 1)
 leupredictorssr<-leupredictors[,!names(leupredictors) %in%c(delleusr$names)]
 leurichness<-read.csv("./out/leusr.csv") %>% select(SR,x,y) %>% mutate(SR=sqrt(SR))%>%merge(leupredictorssr,by=(c("x","y")))%>%
   na.omit()#Ichness is the squared root of the sum of lineages detected in each cell 
@@ -239,7 +238,7 @@ ggplot(data=plotdataleurpd,aes(Degree_of_generalism,RPD))+
 #################################### PSV 
 delleupsv <- todelpsv %>% filter(genus=="Leucocytozoon")
 delleupsv <- delleupsv$names
-delleupsv <-delleupsv[-8]
+delleupsv <-delleupsv[-10]#delete the geographic variable
 leupsv100<-read.csv("out/leupsv100.csv",row.names = 1)%>%
   purrr::set_names(c(rep("psv",100),"x","y"))
 leupredictorspsv=leupredictors[,!names(leupredictors) %in%c(
